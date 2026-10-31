@@ -8,7 +8,11 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 add_compile_options(-Wall -Wextra)
-add_link_options(-static)
+# Static by default; -DECO_STATIC=OFF where only shared libgomp exists (the gcc Docker image).
+option(ECO_STATIC "Link the executables statically" ON)
+if(ECO_STATIC)
+  add_link_options(-static)
+endif()
 
 add_library(core STATIC engine/world.cpp engine/io.cpp engine/cli.cpp)
 target_include_directories(core PUBLIC engine)

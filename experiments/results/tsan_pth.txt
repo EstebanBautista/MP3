@@ -1,0 +1,41 @@
+ThreadSanitizer evidence: pthreads
+date: 2026-10-31T20:15:48Z
+image: gcc:14
+gcc: g++ (GCC) 14.4.0
+kernel: Linux 6.18.54.1-microsoft-standard-WSL2, vm.mmap_rnd_bits=32
+cpus: 16
+build: g++ -std=c++17 -fsanitize=thread -g -O1 -Wall -Wextra -Iengine (pthreads), not static
+TSAN_OPTIONS=halt_on_error=0 exitcode=66 second_deadlock_stack=1
+unbal01 generations: 200 (original input has 10000)
+
+--- eco_pth --threads 4 < input 20x20
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+time wall=0.274127 cpu=0.459924 threads=4 imbalance=1.082
+time wall=0.274127 cpu=0.459924 threads=4 imbalance=1.082
+
+--- eco_pth --threads 8 < input 20x20
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+time wall=0.448386 cpu=0.837992 threads=8 imbalance=1.167
+time wall=0.448386 cpu=0.837992 threads=8 imbalance=1.167
+
+--- eco_pth --threads 4 < input unbal01
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+time wall=0.136137 cpu=0.304945 threads=4 imbalance=1.310
+time wall=0.136137 cpu=0.304945 threads=4 imbalance=1.310
+
+--- eco_pth --threads 8 < input unbal01
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+time wall=0.143211 cpu=0.413474 threads=8 imbalance=1.536
+time wall=0.143211 cpu=0.413474 threads=8 imbalance=1.536
+
+overall: no reports and identical outputs so far
+
+Command that produced this file (together with tsan_omp.txt):
+  docker run --rm --security-opt seccomp=unconfined -e TSAN_IMAGE=gcc:14 -v "$PWD:/src" -w /src gcc:14 bash scripts/tsan.sh
+(seccomp=unconfined lets scripts/tsan.sh run "setarch x86_64 -R", needed because the WSL2 kernel has
+vm.mmap_rnd_bits=32 and TSan aborts with "unexpected memory mapping" otherwise. Without it every run
+died at startup; that first attempt is not part of this evidence.)
+
+Result: 4 of 4 runs finished with exit code 0, 0 ThreadSanitizer warnings and output identical to
+eco_seq. What this supports: no data race was observed in these 4 executions of the Pthreads
+engine. It does not prove absence of races for other inputs or schedules.
