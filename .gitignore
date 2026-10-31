@@ -1,0 +1,6 @@
+build/
+bash.exe.stackdump
+ecosystem_examples/allgen100x100/
+ecosystem_examples/allgen100x100.zip
+__pycache__/
+*.pyc
