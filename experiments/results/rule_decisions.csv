@@ -1,0 +1,9 @@
+key,label,allgen5x5,allgen10x10,allgen20x20,allgen100x100,outputs,conflicts,disagreements,note
+variant_chosen,Elegida: edad tras el reinicio y sin tope,idéntico,idéntico,idéntico,idéntico,iguales,,,
+variant_rabbit_pre,Conejos: comparar antes del reinicio,idéntico,idéntico,"difiere en gen. 870, celda (4,12)","difiere en gen. 1453, celda (56,9)",las 4 difieren,,,
+variant_fox_pre,Zorros: comparar antes del reinicio,idéntico,idéntico,idéntico,idéntico,iguales,,,
+variant_hunger,Zorros: comparar hambre antes de comer,idéntico,idéntico,idéntico,idéntico,iguales,,,
+variant_cap,Edad con tope en GEN_PROC,idéntico,idéntico,"difiere en gen. 836, celda (0,17)","difiere en gen. 44, celda (91,32)",iguales,,,
+rabbit_20x20,,,,,,,9314,3,rabbit conflicts ranked differently before and after the reset
+rabbit_100x100,,,,,,,5959739,5135,rabbit conflicts ranked differently before and after the reset
+fox_200x200,,,,,,,87146,0,fox conflicts ranked differently before and after the reset; 0 in all 7 cases
