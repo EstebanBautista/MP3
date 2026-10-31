@@ -3,6 +3,7 @@
 #pragma once
 #include <chrono>
 #include <climits>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <new>
@@ -26,6 +27,51 @@ inline void staticBands(int rows, int threads, Band* out) {
         out[t].first = next;
         next += base + (t < extra ? 1 : 0);
         out[t].last = next;
+    }
+}
+
+// Cuts the rows in contiguous bands of similar total cost, walking the rows once. Each band takes
+// rows while that brings it closer to an equal share of what remains, so the bands after a very
+// heavy row share the rest evenly instead of paying for it. If there are enough rows no band is
+// empty; if not, each row is a band and the last threads get empty ones, as in staticBands. With no
+// cost at all there is nothing to follow, so the split is the static one. Costs must not be negative.
+inline void adaptiveBands(const int* rowCost, int rows, int threads, Band* out) {
+    long long remaining = 0;
+    for (int x = 0; x < rows; x++) remaining += rowCost[x];
+    if (remaining == 0) {
+        staticBands(rows, threads, out);
+        return;
+    }
+    int next = 0;
+    for (int t = 0; t < threads; t++) {
+        const int left = threads - t;
+        out[t].first = next;
+        if (left == 1) {
+            next = rows;
+        } else if (next < rows) {
+            const int limit = rows - (left - 1);  // Keeps one row for each band after this one.
+            const double share = (double)remaining / left;
+            long long sum = rowCost[next++];
+            while (next < limit &&
+                   fabs((double)(sum + rowCost[next]) - share) < fabs((double)sum - share))
+                sum += rowCost[next++];
+            remaining -= sum;
+        }
+        out[t].last = next;
+    }
+}
+
+// Estimated cost of simulating each row of the band: walking its cells, and a weight per animal for
+// the decision and the delivery. Written to rowCost[x]. The sum saturates at INT_MAX.
+inline void fillRowCosts(const World& w, const Cell* grid, const Band& band, int animalWeight,
+                         int* rowCost) {
+    const int cols = w.cfg.cols;
+    for (int x = band.first; x < band.last; x++) {
+        const Cell* row = &w.at(grid, x, 0);
+        int animals = 0;
+        for (int y = 0; y < cols; y++) animals += row[y].kind == RABBIT || row[y].kind == FOX;
+        const long long cost = cols + (long long)animalWeight * animals;
+        rowCost[x] = cost < INT_MAX ? (int)cost : INT_MAX;
     }
 }
 

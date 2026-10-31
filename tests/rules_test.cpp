@@ -218,6 +218,110 @@ static void testRowOwnersWithUnevenBands() {
     CHECK(owner[0] == 1 && owner[1] == 1 && owner[2] == 1 && owner[3] == 3);
 }
 
+static long long bandCost(const int* cost, const Band& band) {
+    long long sum = 0;
+    for (int x = band.first; x < band.last; x++) sum += cost[x];
+    return sum;
+}
+
+// The largest band, which is what limits the time of a generation.
+static long long largestBand(const int* cost, const Band* bands, int threads) {
+    long long largest = 0;
+    for (int t = 0; t < threads; t++) {
+        const long long c = bandCost(cost, bands[t]);
+        if (c > largest) largest = c;
+    }
+    return largest;
+}
+
+static void checkCoversAll(const Band* bands, int rows, int threads) {
+    int next = 0;
+    for (int t = 0; t < threads; t++) {
+        CHECK(bands[t].first == next);
+        CHECK(bands[t].last >= bands[t].first);
+        next = bands[t].last;
+    }
+    CHECK(next == rows);
+}
+
+static void testAdaptiveBandsEqualizeCost() {
+    // All the load in the first 8 rows of 64: static gives thread 0 all of it.
+    int cost[64];
+    for (int x = 0; x < 64; x++) cost[x] = x < 8 ? 1000 : 10;
+    Band adaptive[4], fixed[4];
+    adaptiveBands(cost, 64, 4, adaptive);
+    staticBands(64, 4, fixed);
+    checkCoversAll(adaptive, 64, 4);
+    CHECK(adaptive[0].last - adaptive[0].first < 8);
+    CHECK(largestBand(cost, adaptive, 4) * 2 < largestBand(cost, fixed, 4));
+
+    // Uniform cost: as even as possible.
+    for (int x = 0; x < 64; x++) cost[x] = 7;
+    adaptiveBands(cost, 64, 4, adaptive);
+    checkCoversAll(adaptive, 64, 4);
+    for (int t = 0; t < 4; t++) CHECK(adaptive[t].last - adaptive[t].first == 16);
+}
+
+static void testAdaptiveBandsDegenerateInputs() {
+    // A heavy row takes a band for itself and the rest share what remains.
+    const int heavyFirst[6] = {100, 1, 1, 1, 1, 1};
+    Band three[3];
+    adaptiveBands(heavyFirst, 6, 3, three);
+    checkCoversAll(three, 6, 3);
+    CHECK(three[0].last == 1);
+    CHECK(three[1].last - three[1].first >= 2 && three[2].last - three[2].first >= 2);
+
+    const int heavyLast[6] = {1, 1, 1, 1, 1, 100};
+    adaptiveBands(heavyLast, 6, 3, three);
+    checkCoversAll(three, 6, 3);
+    CHECK(three[2].first == 5);
+
+    // As many threads as rows: one row each, whatever the costs.
+    Band six[6];
+    adaptiveBands(heavyFirst, 6, 6, six);
+    checkCoversAll(six, 6, 6);
+    for (int t = 0; t < 6; t++) CHECK(six[t].last - six[t].first == 1);
+
+    // More threads than rows: one row each and the last ones empty, as in staticBands.
+    Band many[16];
+    adaptiveBands(heavyFirst, 6, 16, many);
+    checkCoversAll(many, 6, 16);
+    for (int t = 0; t < 16; t++) CHECK(many[t].last - many[t].first == (t < 6 ? 1 : 0));
+
+    Band one[1];
+    adaptiveBands(heavyFirst, 6, 1, one);
+    CHECK(one[0].first == 0 && one[0].last == 6);
+
+    // No load at all: nothing to follow, so an even split.
+    const int zero[6] = {0, 0, 0, 0, 0, 0};
+    Band two[2];
+    adaptiveBands(zero, 6, 2, two);
+    CHECK(two[0].first == 0 && two[0].last == 3 && two[1].first == 3 && two[1].last == 6);
+
+    // Zero cost rows mixed with a cost that does not reach overflow when added up.
+    const int big[4] = {INT_MAX, 0, INT_MAX, INT_MAX};
+    Band pair[2];
+    adaptiveBands(big, 4, 2, pair);
+    checkCoversAll(pair, 4, 2);
+    CHECK(bandCost(big, pair[0]) > 0 && bandCost(big, pair[1]) > 0);
+}
+
+static void testRowCosts() {
+    World w;
+    initWorld(w, 3, 3, 3, 4);
+    w.at(w.cur, 0, 0) = make(RABBIT, 0, 0);
+    w.at(w.cur, 0, 3) = make(FOX, 0, 0);
+    w.at(w.cur, 1, 2) = make(ROCK, 0, 0);
+    w.at(w.cur, 2, 1) = make(RABBIT, 0, 0);
+    int cost[3] = {-1, -1, -1};
+    fillRowCosts(w, w.cur, Band{0, 2}, 10, cost);
+    CHECK(cost[0] == 4 + 2 * 10);  // Animals of both kinds count.
+    CHECK(cost[1] == 4);           // A rock does not.
+    CHECK(cost[2] == -1);          // Outside the band: untouched.
+    fillRowCosts(w, w.cur, Band{0, 1}, INT_MAX, cost);
+    CHECK(cost[0] == INT_MAX);     // Saturates instead of overflowing.
+}
+
 static void testMoveBoxGrowsWithoutLosingElements() {
     MoveBox box{};
     CHECK(box.items == nullptr && box.count == 0 && box.capacity == 0);
@@ -260,6 +364,9 @@ int main() {
     testCarryRules();
     testStaticBands();
     testRowOwnersWithUnevenBands();
+    testAdaptiveBandsEqualizeCost();
+    testAdaptiveBandsDegenerateInputs();
+    testRowCosts();
     testMoveBoxGrowsWithoutLosingElements();
     if (failures) printf("%d failures\n", failures);
     return failures ? 1 : 0;

@@ -3,10 +3,21 @@ import os
 import random
 import re
 import struct
+import subprocess
 import tempfile
 import unittest
 
-from tests.helpers import CASES, EXAMPLES, EXE, case_input, case_output, normalize, run_engine
+from tests.helpers import (
+    BUILD,
+    CASES,
+    EXAMPLES,
+    EXE,
+    case_input,
+    case_output,
+    normalize,
+    run_engine,
+    with_generations,
+)
 
 
 def allgen(name):
@@ -51,6 +62,21 @@ class TestDumpAll(unittest.TestCase):
 THREAD_COUNTS = (1, 2, 4, 8, 16)
 PTH = EXE["eco_pth"]
 SEQ = EXE["eco_seq"]
+
+
+def dense_thin_worlds():
+    """Narrow bands make most moves cross a border, conflicts included, and the boxes must grow past
+    their first capacity. Compare every generation, not only the last one."""
+    rng = random.Random(20261031)
+    shapes = ((1, 300), (300, 1), (2, 300), (3, 200), (9, 40), (40, 9), (64, 64))
+    for rows, cols in shapes:
+        cells = [(x, y) for x in range(rows) for y in range(cols)]
+        objects = []
+        for x, y in rng.sample(cells, len(cells) * 3 // 5):
+            kind = rng.choices(("RABBIT", "FOX", "ROCK"), (6, 3, 1))[0]
+            objects.append("%s %d %d\n" % (kind, x, y))
+        head = "2 3 4 40 %d %d %d\n" % (rows, cols, len(objects))
+        yield rows, cols, (head + "".join(objects)).encode()
 
 
 class TestPthreads(unittest.TestCase):
@@ -126,18 +152,7 @@ class TestPthreads(unittest.TestCase):
         self.assertGreater(float(match.group(1)), 2.0)
 
     def test_pth_dense_thin_worlds_match_seq(self):
-        # Narrow bands make most moves cross a border, conflicts included, and the boxes must grow
-        # past their first capacity. Every generation is compared, not only the last one.
-        rng = random.Random(20261031)
-        shapes = ((1, 300), (300, 1), (2, 300), (3, 200), (9, 40), (40, 9), (64, 64))
-        for rows, cols in shapes:
-            cells = [(x, y) for x in range(rows) for y in range(cols)]
-            objects = []
-            for x, y in rng.sample(cells, len(cells) * 3 // 5):
-                kind = rng.choices(("RABBIT", "FOX", "ROCK"), (6, 3, 1))[0]
-                objects.append("%s %d %d\n" % (kind, x, y))
-            head = "2 3 4 40 %d %d %d\n" % (rows, cols, len(objects))
-            data = (head + "".join(objects)).encode()
+        for rows, cols, data in dense_thin_worlds():
             expected = run_engine(SEQ, data, extra=["--dump-all"]).stdout
             for threads in (2, 3, 5, 16):
                 with self.subTest(rows=rows, cols=cols, threads=threads):
@@ -156,6 +171,143 @@ def _add_pth_case(name, threads):
 for _name in CASES:
     for _threads in THREAD_COUNTS:
         _add_pth_case(_name, _threads)
+
+
+OMP = EXE["eco_omp"]
+SCHEDULES = ("adaptive", "static")
+
+
+class TestOpenMP(unittest.TestCase):
+    def check_final(self, name, threads, schedule):
+        r = run_engine(OMP, case_input(name), threads=threads, extra=["--schedule", schedule])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(normalize(r.stdout), normalize(case_output(name)))
+        self.assertIn(b"threads=%d " % threads, r.stderr)
+
+    def test_adaptive_bands_cover_all(self):
+        # Rebalancing must not lose or repeat a row, in any generation. Adaptive is the default.
+        data = with_generations(case_input("100x100_unbal01"), 200)
+        expected = run_engine(SEQ, data, extra=["--dump-all"]).stdout
+        r = run_engine(OMP, data, threads=8, extra=["--dump-all"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, expected)
+
+    def test_adaptive_bands_follow_the_load(self):
+        # Deterministic: checks the cuts themselves, so scheduling noise cannot change the outcome.
+        path = os.path.join(EXAMPLES, "input100x100_unbal01")
+        r = subprocess.run([os.path.join(BUILD, "omp_bands_test.exe"), path], capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_omp_extinction_16(self):
+        r = run_engine(OMP, b"2 4 2 5 3 3 1\nFOX 1 1\n", threads=16)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(normalize(r.stdout), b"2 4 2 0 3 3 0\n")
+
+    def test_omp_repeat_unbal(self):
+        expected = normalize(case_output("100x100_unbal01"))
+        for i in range(20):
+            r = run_engine(OMP, case_input("100x100_unbal01"), threads=8)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(normalize(r.stdout), expected, "run %d" % i)
+
+    def test_omp_zero_generations(self):
+        data = b"2 4 3 0 2 2 1\nFOX 0 0\n"
+        r = run_engine(OMP, data, threads=4)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(normalize(r.stdout), data)
+        self.assertIn(b"threads=4 imbalance=1.000", r.stderr)
+
+    def test_omp_dump_all(self):
+        for name in ("5x5", "10x10", "20x20"):
+            for threads in (1, 3, 8):
+                for schedule in SCHEDULES:
+                    with self.subTest(name=name, threads=threads, schedule=schedule):
+                        extra = ["--dump-all", "--schedule", schedule]
+                        r = run_engine(OMP, case_input(name), threads=threads, extra=extra)
+                        self.assertEqual(r.returncode, 0, r.stderr)
+                        self.assertEqual(normalize(r.stdout), normalize(allgen(name)))
+
+    def test_omp_dense_thin_worlds_match_seq(self):
+        # More threads than rows, and long enough to go through several rebalances.
+        for rows, cols, data in dense_thin_worlds():
+            data = with_generations(data, 170)
+            expected = run_engine(SEQ, data, extra=["--dump-all"]).stdout
+            for threads in (2, 5, 16):
+                with self.subTest(rows=rows, cols=cols, threads=threads):
+                    r = run_engine(OMP, data, threads=threads, extra=["--dump-all"])
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertEqual(r.stdout, expected)
+
+    def test_omp_frames_and_stats_match_seq(self):
+        data = case_input("10x10")
+        seq = run_engine(SEQ, data, extra=["--frames"])
+        omp = run_engine(OMP, data, threads=4, extra=["--frames"])
+        self.assertEqual(omp.returncode, 0, omp.stderr)
+        self.assertEqual(omp.stdout, seq.stdout)
+        with tempfile.TemporaryDirectory() as d:
+            contents = []
+            for exe, threads in ((SEQ, None), (OMP, 4)):
+                path = os.path.join(d, "stats.csv")
+                r = run_engine(exe, data, threads=threads, extra=["--stats-file", path])
+                self.assertEqual(r.returncode, 0, r.stderr)
+                with open(path, "rb") as f:
+                    contents.append(f.read())
+        self.assertEqual(contents[0], contents[1])
+
+    def test_omp_reports_the_team_it_really_got(self):
+        # The runtime may give fewer threads than requested, and the bands must be cut for those.
+        data = with_generations(case_input("100x100_unbal01"), 200)
+        expected = run_engine(SEQ, data).stdout
+        env = dict(os.environ, OMP_THREAD_LIMIT="2", OMP_DYNAMIC="true")
+        r = run_engine(OMP, data, threads=8, env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, expected)
+        self.assertIn(b"threads=2 ", r.stderr)
+
+    def test_omp_imbalance_is_reported(self):
+        for schedule in SCHEDULES:
+            with self.subTest(schedule=schedule):
+                r = run_engine(
+                    OMP, case_input("100x100_unbal01"), threads=4, extra=["--schedule", schedule]
+                )
+                match = re.search(rb"threads=4 imbalance=(\d+\.\d+)", r.stderr)
+                self.assertIsNotNone(match, r.stderr)
+                self.assertGreaterEqual(float(match.group(1)), 1.0)
+
+    def test_schedule_option_only_in_omp(self):
+        data = b"2 4 3 1 2 2 0\n"
+        for exe in (SEQ, PTH):
+            for value in SCHEDULES:
+                with self.subTest(exe=exe, value=value):
+                    r = run_engine(exe, data, extra=["--schedule", value])
+                    self.assertEqual(r.returncode, 2)
+                    self.assertEqual(r.stdout, b"")
+                    self.assertIn(b"unknown option '--schedule'", r.stderr)
+
+    def test_schedule_option_values(self):
+        data = b"2 4 3 1 2 2 0\n"
+        for extra in (["--schedule"], ["--schedule", "dynamic"], ["--schedule", ""]):
+            with self.subTest(extra=extra):
+                r = run_engine(OMP, data, extra=extra)
+                self.assertEqual(r.returncode, 2)
+                self.assertEqual(r.stdout, b"")
+                self.assertTrue(r.stderr)
+        for value in SCHEDULES:
+            with self.subTest(value=value):
+                self.assertEqual(run_engine(OMP, data, extra=["--schedule", value]).returncode, 0)
+
+
+def _add_omp_case(name, threads, schedule):
+    def test(self):
+        self.check_final(name, threads, schedule)
+
+    setattr(TestOpenMP, "test_omp_%s_%d_%s" % (name, threads, schedule), test)
+
+
+for _name in CASES:
+    for _threads in THREAD_COUNTS:
+        for _schedule in SCHEDULES:
+            _add_omp_case(_name, _threads, _schedule)
 
 
 if __name__ == "__main__":

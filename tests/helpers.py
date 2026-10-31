@@ -24,12 +24,20 @@ def case_output(name):
         return f.read()
 
 
-def run_engine(exe, input_bytes, threads=None, extra=()):
+def run_engine(exe, input_bytes, threads=None, extra=(), env=None):
     cmd = [exe]
     if threads is not None:
         cmd += ["--threads", str(threads)]
     cmd += list(extra)
-    return subprocess.run(cmd, input=input_bytes, capture_output=True)
+    return subprocess.run(cmd, input=input_bytes, capture_output=True, env=env)
+
+
+def with_generations(input_bytes, generations):
+    """The same world with N_GEN, the fourth number of the header, replaced."""
+    head, rest = input_bytes.split(b"\n", 1)
+    fields = head.split()
+    fields[3] = b"%d" % generations
+    return b" ".join(fields) + b"\n" + rest
 
 
 def normalize(data):

@@ -21,5 +21,14 @@ find_package(Threads REQUIRED)
 add_executable(eco_pth engine/main_pth.cpp engine/sim_pth.cpp)
 target_link_libraries(eco_pth core Threads::Threads)
 
+find_package(OpenMP REQUIRED)
+add_library(sim_omp STATIC engine/sim_omp.cpp)
+target_link_libraries(sim_omp PUBLIC core OpenMP::OpenMP_CXX)
+add_executable(eco_omp engine/main_omp.cpp)
+target_link_libraries(eco_omp sim_omp)
+
 add_executable(rules_test tests/rules_test.cpp)
 target_link_libraries(rules_test core)
+
+add_executable(omp_bands_test tests/omp_bands_test.cpp engine/sim_seq.cpp)
+target_link_libraries(omp_bands_test sim_omp)

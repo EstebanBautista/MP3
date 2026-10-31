@@ -58,10 +58,20 @@ struct Options {
     const char* statsPath = nullptr;
 };
 
-bool parseOptions(int argc, char** argv, Options& o) {
+bool parseOptions(int argc, char** argv, Options& o, Simulator& sim) {
+    const char* extra = sim.extraOption();
     for (int i = 1; i < argc; i++) {
         const char* a = argv[i];
-        if (!strcmp(a, "--threads")) {
+        if (extra && !strcmp(a, extra)) {
+            if (++i >= argc) {
+                fprintf(stderr, "error: %s needs a value\n", extra);
+                return false;
+            }
+            if (!sim.setExtraOption(argv[i])) {
+                fprintf(stderr, "error: invalid value '%s' for %s\n", argv[i], extra);
+                return false;
+            }
+        } else if (!strcmp(a, "--threads")) {
             if (++i >= argc) {
                 fprintf(stderr, "error: --threads needs a value\n");
                 return false;
@@ -252,7 +262,7 @@ int engineMain(int argc, char** argv, Simulator& sim) {
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
     Options opt;
-    if (!parseOptions(argc, argv, opt)) return 2;
+    if (!parseOptions(argc, argv, opt, sim)) return 2;
 
     World w;
     char err[160];
