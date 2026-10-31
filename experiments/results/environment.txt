@@ -1,0 +1,15 @@
+date: 2026-10-31T16:09:20
+platform: Windows-10-10.0.19045-SP0
+machine: AMD64
+cpu: Intel(R) Core(TM) i7-10700F CPU @ 2.90GHz
+cores/logical: 8/16
+ram_bytes: 34265849856
+power plan: GUID de plan de energ¡a: b4685fb2-c342-4a32-acb2-6eaaf23fb657  (Plus-Ultra)
+cpu load before run (5 x 1 s samples, % total): 0
+compiler: g++.exe (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders, r1) 16.2.0
+compiler path: C:\Users\ESTEBAN\AppData\Local\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin\g++.exe
+compile flags: -O3 -std=gnu++17 -Wall -Wextra
+reps: 7; threads: [1, 2, 4, 8, 16]; cases: ['20x20', '100x100', '200x200', '100x100_unbal01', '100x100_unbal02', 'large1000x1000']
+order: alternating (forward on odd reps, reversed on even reps)
+large world parameters: {'seed': 20261031, 'rows': 1000, 'cols': 1000, 'rabbits': 25000, 'foxes': 5000, 'rocks': 5000, 'gen_proc_rabbits': 3, 'gen_proc_foxes': 20, 'gen_food_foxes': 10, 'n_gen': 1000}
+wall = monotonic clock; cpu = process CPU time (Windows resolution ~15.6 ms)

@@ -1,0 +1,15 @@
+date: 2026-10-31T21:35:21
+platform: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.41
+machine: x86_64
+cpu: model name	: Intel(R) Core(TM) i7-10700F CPU @ 2.90GHz
+logical cpus: 16
+meminfo: MemTotal:       16330644 kB
+loadavg: 0.28 0.06 0.02 1/441 355
+compiler: c++ (GCC) 14.4.0
+compiler path: /usr/local/bin/c++
+compile flags: unknown
+reps: 3; threads: [1, 2, 4, 8, 16]; cases: ['20x20', '100x100', '200x200', '100x100_unbal01', '100x100_unbal02', 'large1000x1000']
+order: alternating (forward on odd reps, reversed on even reps)
+large world parameters: {'seed': 20261031, 'rows': 1000, 'cols': 1000, 'rabbits': 25000, 'foxes': 5000, 'rocks': 5000, 'gen_proc_rabbits': 3, 'gen_proc_foxes': 20, 'gen_food_foxes': 10, 'n_gen': 1000}
+wall = monotonic clock; cpu = process CPU time (Windows resolution ~15.6 ms)
+note: the Linux run measured only cases 200x200 and large1000x1000, reps=3, threads 1 2 4 8 16 (see performance_linux.csv). Build: cmake Release -DECO_STATIC=OFF (-O3), gcc 14.4.0 in image gcc:14. Runs in a container on WSL2 / Docker Desktop on the same Windows machine, not native Linux.
