@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 
-from tests.helpers import BUILD, EXE, ROOT, case_input, run_engine
+from tests.helpers import BUILD, EXE, EXE_SUFFIX, ROOT, case_input, run_engine
 
 SEQ = EXE["eco_seq"]
 TIME_LINE = re.compile(
@@ -84,6 +84,7 @@ class TestCommandLine(unittest.TestCase):
             ["--threads", "x"],
             ["--nope"],
             ["--stats-file"],
+            ["--stats-file", "--frames"],
             ["--frames", "--dump-all"],
         ):
             with self.subTest(extra=extra):
@@ -176,7 +177,7 @@ class TestDiffAllgen(unittest.TestCase):
 class TestRulesUnit(unittest.TestCase):
     def test_merge_rules(self):
         # Native test of the merge functions: commutativity, winners and fox over rabbit.
-        r = subprocess.run([os.path.join(BUILD, "rules_test.exe")], capture_output=True)
+        r = subprocess.run([os.path.join(BUILD, "rules_test" + EXE_SUFFIX)], capture_output=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 

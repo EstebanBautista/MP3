@@ -12,6 +12,7 @@ from tests.helpers import (
     CASES,
     EXAMPLES,
     EXE,
+    EXE_SUFFIX,
     case_input,
     case_output,
     normalize,
@@ -195,7 +196,7 @@ class TestOpenMP(unittest.TestCase):
     def test_adaptive_bands_follow_the_load(self):
         # Deterministic: checks the cuts themselves, so scheduling noise cannot change the outcome.
         path = os.path.join(EXAMPLES, "input100x100_unbal01")
-        r = subprocess.run([os.path.join(BUILD, "omp_bands_test.exe"), path], capture_output=True)
+        r = subprocess.run([os.path.join(BUILD, "omp_bands_test" + EXE_SUFFIX), path], capture_output=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_omp_extinction_16(self):

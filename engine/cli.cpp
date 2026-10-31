@@ -89,7 +89,7 @@ bool parseOptions(int argc, char** argv, Options& o, Simulator& sim) {
         } else if (!strcmp(a, "--frames")) {
             o.frames = true;
         } else if (!strcmp(a, "--stats-file")) {
-            if (++i >= argc) {
+            if (++i >= argc || !strncmp(argv[i], "--", 2)) {
                 fprintf(stderr, "error: --stats-file needs a path\n");
                 return false;
             }

@@ -6,7 +6,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = os.path.join(ROOT, "build")
 EXAMPLES = os.path.join(ROOT, "ecosystem_examples")
 
-EXE = {name: os.path.join(BUILD, name + ".exe") for name in ("eco_seq", "eco_pth", "eco_omp")}
+EXE_SUFFIX = ".exe" if os.name == "nt" else ""
+EXE = {name: os.path.join(BUILD, name + EXE_SUFFIX) for name in ("eco_seq", "eco_pth", "eco_omp")}
 
 CASES = (
     "5x5", "10x10", "20x20", "100x100", "200x200",

@@ -7,7 +7,9 @@
 // mergeRabbit/mergeFox in any order, synchronizing only the access to cells it shares.
 //
 // Decisions taken from the allgen example files. All of them reproduce allgen5x5, allgen10x10,
-// allgen20x20 and allgen100x100 (10001 generations), and the 7 final outputs, byte for byte.
+// allgen20x20 and allgen100x100 (10001 generations), and the 7 final outputs. The allgen files are
+// compared with tools/diff_allgen.py, which ignores line endings and trailing blank lines, and the
+// final outputs after normalizing line endings, so this is not a strict byte-for-byte match.
 //
 // - Ages have no cap. A rabbit that cannot move keeps aging past GEN_PROC_RABBITS: allgen20x20
 //   shows age 4 with GEN_PROC_RABBITS=3 (generation 836, cell (0,17)), and allgen100x100 shows
