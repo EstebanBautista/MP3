@@ -10,8 +10,11 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 add_compile_options(-Wall -Wextra)
 add_link_options(-static)
 
-add_library(core STATIC engine/world.cpp engine/io.cpp)
+add_library(core STATIC engine/world.cpp engine/io.cpp engine/cli.cpp)
 target_include_directories(core PUBLIC engine)
 
-add_executable(eco_seq engine/main_seq.cpp)
+add_executable(eco_seq engine/main_seq.cpp engine/sim_seq.cpp)
 target_link_libraries(eco_seq core)
+
+add_executable(rules_test tests/rules_test.cpp)
+target_link_libraries(rules_test core)
