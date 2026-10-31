@@ -1,10 +1,13 @@
 // Partition of the grid in row bands and the mailboxes for moves that cross them. Independent of the
 // threading library, so every band based simulator can share it.
 #pragma once
+#include <chrono>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
+#include <new>
 
+#include "rules.hpp"
 #include "world.hpp"
 
 // Rows first..last-1 of the grid. Empty if first == last.
@@ -73,4 +76,123 @@ inline void freeMoveBox(MoveBox& box) {
     box.items = nullptr;
     box.count = 0;
     box.capacity = 0;
+}
+
+[[noreturn]] inline void fatal(const char* message) {
+    fprintf(stderr, "error: %s\n", message);
+    exit(1);
+}
+
+// A zeroed array. The aligned form of operator new honors the cache line alignment of MoveBox.
+template <typename T>
+T* allocateArray(size_t n) {
+    T* p = new (std::nothrow) T[n]();
+    if (!p) fatal("cannot allocate memory for the threads");
+    return p;
+}
+
+class Stopwatch {
+public:
+    void start() { begin_ = std::chrono::steady_clock::now(); }
+    void stop() {
+        seconds_ += std::chrono::duration<double>(std::chrono::steady_clock::now() - begin_).count();
+    }
+    double seconds() const { return seconds_; }
+
+private:
+    std::chrono::steady_clock::time_point begin_;
+    double seconds_ = 0.0;
+};
+
+// Maximum busy time divided by the mean, 1 if nobody did anything.
+inline double maxOverMean(const double* busy, int threads) {
+    double total = 0.0, largest = 0.0;
+    for (int t = 0; t < threads; t++) {
+        total += busy[t];
+        if (busy[t] > largest) largest = busy[t];
+    }
+    return total > 0.0 ? largest * threads / total : 1.0;
+}
+
+// What the two passes of a subphase share, whatever threads run them. Each subphase reads a grid no
+// one writes and builds the other one, in two passes that the caller separates and follows with a
+// synchronization point:
+//   1. Local pass: each thread walks its band in the source grid. It clears and writes only cells of
+//      its band in the destination grid. Moves that land in another band go to a MoveBox.
+//   2. Inbound pass: each thread applies with merge* the boxes addressed to it, again writing only
+//      its band, and empties them for the next subphase.
+// No cell is written by two threads and no box is used by two threads at once, so the merges need no
+// locks, and the merge rules make the result independent of the order of arrival.
+struct BandPlan {
+    World* w;
+    int threads;
+    const Band* bands;
+    const int* rowOwner;
+    MoveBox* boxes;  // threads * threads, indexed by source and then destination.
+};
+
+// Hands a candidate to its cell if the thread owns it, or to the box of the thread that does.
+template <void Merge(Cell&, const Cell&)>
+class BandSink {
+public:
+    BandSink(const BandPlan& plan, int id, Cell* dst) : plan_(plan), id_(id), dst_(dst) {}
+    void operator()(int x, int y, const Cell& candidate) const {
+        const Band& band = plan_.bands[id_];
+        if (x >= band.first && x < band.last) {
+            Merge(dst_[(size_t)x * plan_.w->cfg.cols + y], candidate);
+        } else {
+            const int owner = plan_.rowOwner[x];
+            pushMove(plan_.boxes[(size_t)id_ * plan_.threads + owner], x, y, candidate);
+        }
+    }
+
+private:
+    const BandPlan& plan_;
+    int id_;
+    Cell* dst_;
+};
+
+inline void clearBand(const World& w, Cell* grid, const Band& band) {
+    const size_t end = (size_t)band.last * w.cfg.cols;
+    for (size_t i = (size_t)band.first * w.cfg.cols; i < end; i++) grid[i] = Cell{};
+}
+
+inline void rabbitLocalPass(const BandPlan& plan, int id, int gen, const Cell* src, Cell* dst) {
+    const World& w = *plan.w;
+    const Band& band = plan.bands[id];
+    const BandSink<mergeRabbit> sink(plan, id, dst);
+    clearBand(w, dst, band);
+    for (int x = band.first; x < band.last; x++)
+        for (int y = 0; y < w.cfg.cols; y++) {
+            const Cell& c = w.at(src, x, y);
+            if (c.kind == RABBIT) deliverRabbitMove(decideRabbit(w, src, gen, x, y), x, y, sink);
+            else carryRabbitSubphase(dst[(size_t)x * w.cfg.cols + y], c);
+        }
+}
+
+inline void foxLocalPass(const BandPlan& plan, int id, int gen, const Cell* src, Cell* dst) {
+    const World& w = *plan.w;
+    const Band& band = plan.bands[id];
+    const BandSink<mergeFox> sink(plan, id, dst);
+    clearBand(w, dst, band);
+    for (int x = band.first; x < band.last; x++)
+        for (int y = 0; y < w.cfg.cols; y++) {
+            const Cell& c = w.at(src, x, y);
+            if (c.kind == FOX) deliverFoxMove(decideFox(w, src, gen, x, y), x, y, sink);
+            else carryFoxSubphase(dst[(size_t)x * w.cfg.cols + y], c);
+        }
+}
+
+template <void Merge(Cell&, const Cell&)>
+void inboundPass(const BandPlan& plan, int id, Cell* dst) {
+    if (plan.bands[id].first == plan.bands[id].last) return;  // Nothing can land in an empty band.
+    const int cols = plan.w->cfg.cols;
+    for (int source = 0; source < plan.threads; source++) {
+        MoveBox& box = plan.boxes[(size_t)source * plan.threads + id];
+        for (int i = 0; i < box.count; i++) {
+            const MoveBox::Move& m = box.items[i];
+            Merge(dst[(size_t)m.x * cols + m.y], m.cell);
+        }
+        box.count = 0;
+    }
 }

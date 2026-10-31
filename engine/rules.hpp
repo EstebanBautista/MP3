@@ -153,15 +153,30 @@ inline void carryFoxSubphase(Cell& dst, const Cell& c) {
     else if (c.kind == ROCK) dst = c;
 }
 
-// Delivery of a whole move to the new grid, for callers with no cell shared between threads. The
+// Delivery of a whole move, one candidate at a time, to whatever `sink(x, y, cell)` does with it. The
 // child's cell is the one the parent left, which no other animal can target in this subphase.
+template <typename Sink>
+inline void deliverRabbitMove(const Move& m, int x, int y, Sink&& sink) {
+    sink(m.destX, m.destY, m.animal);
+    if (m.hasChild) sink(x, y, newborn(RABBIT));
+}
+
+template <typename Sink>
+inline void deliverFoxMove(const Move& m, int x, int y, Sink&& sink) {
+    if (!m.alive) return;
+    sink(m.destX, m.destY, m.animal);
+    if (m.hasChild) sink(x, y, newborn(FOX));
+}
+
+// Delivery to the new grid, for callers with no cell shared between threads.
 inline void applyRabbitMove(const World& w, Cell* dst, const Move& m, int x, int y) {
-    mergeRabbit(dst[(size_t)m.destX * w.cfg.cols + m.destY], m.animal);
-    if (m.hasChild) mergeRabbit(dst[(size_t)x * w.cfg.cols + y], newborn(RABBIT));
+    deliverRabbitMove(m, x, y, [&](int destX, int destY, const Cell& c) {
+        mergeRabbit(dst[(size_t)destX * w.cfg.cols + destY], c);
+    });
 }
 
 inline void applyFoxMove(const World& w, Cell* dst, const Move& m, int x, int y) {
-    if (!m.alive) return;
-    mergeFox(dst[(size_t)m.destX * w.cfg.cols + m.destY], m.animal);
-    if (m.hasChild) mergeFox(dst[(size_t)x * w.cfg.cols + y], newborn(FOX));
+    deliverFoxMove(m, x, y, [&](int destX, int destY, const Cell& c) {
+        mergeFox(dst[(size_t)destX * w.cfg.cols + destY], c);
+    });
 }
