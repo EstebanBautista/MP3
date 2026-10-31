@@ -24,6 +24,7 @@ DATA = os.path.join(ROOT, "experiments", "data")
 RESULTS = os.path.join(ROOT, "experiments", "results")
 EXAMPLES = os.path.join(ROOT, "ecosystem_examples")
 
+NL = chr(10)
 FIELDS = ["design", "mode", "case", "threads", "rep", "wall", "cpu", "imbalance", "timestamp"]
 TIME_RE = re.compile(r"time wall=(\S+) cpu=(\S+) threads=(\d+) imbalance=(\S+)")
 
@@ -235,7 +236,7 @@ def markdown_tables(rows):
                        and x["threads"] == 1)
             out.append(f"| {name} | " + " | ".join(cells) + f" | {one['overhead_vs_seq'] * 100:+.1f} % |")
         out.append("")
-    return os.linesep.replace("\r", "").join(out)
+    return NL.join(out)
 
 
 def cmd_tables(a):
@@ -266,9 +267,21 @@ def build_compiler_info(build):
         m = re.search(r"^\s*FLAGS = (.+)$", open(ninja).read(), re.M)
         if m:
             flags = m.group(1).strip()
+    # Makefile generators keep the flags in CMakeFiles/<target>.dir/flags.make instead.
+    extra = []
+    for t in ("eco_seq", "eco_pth", "eco_omp", "sim_omp", "core"):
+        fm = os.path.join(build, "CMakeFiles", t + ".dir", "flags.make")
+        if os.path.exists(fm):
+            m = re.search(r"^CXX_FLAGS = (.*)$", open(fm).read(), re.M)
+            extra.append(f"flags {t}: {m.group(1).strip() if m else 'unknown'}")
+    if os.path.exists(cache):
+        txt = open(cache).read()
+        for var in ("CMAKE_BUILD_TYPE", "CMAKE_CXX_FLAGS_RELEASE", "ECO_STATIC"):
+            m = re.search(rf"^{var}:\w+=(.*)$", txt, re.M)
+            if m:
+                extra.append(f"cmake {var}: {m.group(1).strip()}")
     ver = (sh([cxx, "--version"]).splitlines() or ["unavailable"])[0]
-    return os.linesep.replace("\r", "").join(
-        [f"compiler: {ver}", f"compiler path: {cxx}", f"compile flags: {flags}"])
+    return NL.join([f"compiler: {ver}", f"compiler path: {cxx}", f"compile flags: {flags}"] + extra)
 
 
 def cmd_env(a):
@@ -287,8 +300,16 @@ def cmd_env(a):
         lines.append("logical cpus: " + sh(["nproc"]))
         lines.append("meminfo: " + sh(["sh", "-c", "grep MemTotal /proc/meminfo"]))
         lines.append("loadavg: " + sh(["cat", "/proc/loadavg"]))
+        lines.append("cgroup cpu.max: " + sh(["sh", "-c", "cat /sys/fs/cgroup/cpu.max 2>&1"]))
+        lines.append("cgroup cpuset.cpus.effective: " + sh(
+            ["sh", "-c", "cat /sys/fs/cgroup/cpuset.cpus.effective 2>&1"]))
+        lines.append("taskset affinity: " + sh(["sh", "-c", "grep Cpus_allowed_list /proc/self/status"]))
+        lines.append("cpu0 siblings (SMT pairs): " + sh(["sh", "-c", (
+            "cat /sys/devices/system/cpu/cpu0/topology/thread_siblings_list 2>&1")]))
+        lines.append("lscpu: " + sh(["sh", "-c", "lscpu 2>&1 | grep -E 'Thread|Core|Socket|Hypervisor|^CPU\\(s\\)'"]))
+        lines.append("OMP_*/GOMP_* env: " + sh(["sh", "-c", "env | grep -E '^(OMP|GOMP)_' || echo none"]))
     lines.append(build_compiler_info(a.build))
-    lines.append(f"reps: {a.reps}; threads: {DEFAULT_THREADS}; cases: {DEFAULT_CASES}")
+    lines.append(f"reps: {a.reps}; threads: {a.threads}; cases: {a.cases}")
     lines.append("order: alternating (forward on odd reps, reversed on even reps)")
     lines.append(f"large world parameters: {LARGE}")
     lines.append("wall = monotonic clock; cpu = process CPU time (Windows resolution ~15.6 ms)")
@@ -314,6 +335,8 @@ def main():
     e = sp.add_parser("env")
     e.add_argument("--out", default=os.path.join(RESULTS, "environment.txt"))
     e.add_argument("--build", default=os.path.join(ROOT, "build"))
+    e.add_argument("--cases", nargs="+", default=DEFAULT_CASES)
+    e.add_argument("--threads", nargs="+", type=int, default=DEFAULT_THREADS)
     e.add_argument("--reps", type=int, default=7)
     e.add_argument("--append", action="store_true")
     a = p.parse_args()

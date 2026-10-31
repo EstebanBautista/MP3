@@ -51,9 +51,8 @@ def style():
 
 
 def cores_marker(ax):
-    ax.axvline(PHYSICAL, color="#898781", lw=1, ls=":")
-    ax.text(PHYSICAL, 1.0, " 8 núcleos físicos", transform=ax.get_xaxis_transform(), rotation=90,
-            va="top", ha="right", fontsize=7, color=MUTED)
+    """Dotted line at 8 physical cores; named in the legend so no text sits over the data."""
+    ax.axvline(PHYSICAL, color="#898781", lw=1, ls=":", label="8 núcleos físicos")
 
 
 def thread_axis(ax):
@@ -75,7 +74,7 @@ def grid_figure(cases, title):
     return fig, flat
 
 
-def legend(fig, handles_from, ncol=4):
+def legend(fig, handles_from, ncol=5):
     h, l = handles_from.get_legend_handles_labels()
     fig.legend(h, l, loc="lower center", ncol=ncol, frameon=False)
 
@@ -161,7 +160,7 @@ def fig_wall_cpu(stats, cases, platform, path):
         ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
         ax.set_title(CASE_TITLES.get(case, case))
         ax.set_ylabel("Segundos (escala log.)")
-    legend(fig, axes[0], ncol=3)
+    legend(fig, axes[0], ncol=4)
     fig.tight_layout(rect=(0, 0.1, 1, 0.95), w_pad=1.5)
     fig.savefig(path)
     plt.close(fig)
@@ -182,7 +181,7 @@ def fig_imbalance(stats, cases, platform, path):
         ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.2f}".replace(".", ",")))
         ax.set_xlim(1.6, 18)
         ax.set_ylabel("Desequilibrio")
-    legend(fig, axes[0], ncol=3)
+    legend(fig, axes[0], ncol=4)
     fig.tight_layout(rect=(0, 0.06, 1, 0.93))
     fig.savefig(path)
     plt.close(fig)
