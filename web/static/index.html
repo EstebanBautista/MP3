@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecosistema de conejos y zorros</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<svg width="0" height="0" class="defs" aria-hidden="true">
+  <symbol id="g-rabbit" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="#E6D27A"/></symbol>
+  <symbol id="g-fox" viewBox="0 0 12 12"><path d="M6 .8 11.6 11H.4z" fill="#DE5A2A"/></symbol>
+  <symbol id="g-rock" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="1.5" fill="#7088A8"/></symbol>
+</svg>
+
+<main class="columns">
+
+  <form id="setup" class="setup" novalidate>
+    <h1>Ecosistema de conejos y zorros</h1>
+
+    <fieldset class="source">
+      <legend class="sr">Origen del mundo</legend>
+      <label><input type="radio" name="source" value="case" checked><span>Caso de prueba</span></label>
+      <label><input type="radio" name="source" value="random"><span>Mundo aleatorio</span></label>
+    </fieldset>
+
+    <label class="field" id="case-field">
+      <span class="name">Caso</span>
+      <select id="case"></select>
+    </label>
+
+    <div class="field seed-field" id="seed-field">
+      <label for="seed" class="name">Semilla</label>
+      <div class="seed-row">
+        <input id="seed" type="number" min="0" step="1">
+        <button type="button" id="reroll" class="quiet">Otra semilla</button>
+      </div>
+    </div>
+
+    <div class="group" id="world-fields">
+      <div class="pair">
+        <label class="field"><span class="name">Filas <code>R</code></span><input id="rows" type="number" min="1" max="500"></label>
+        <label class="field"><span class="name">Columnas <code>C</code></span><input id="cols" type="number" min="1" max="500"></label>
+      </div>
+      <div class="trio">
+        <label class="field"><span class="name"><svg class="glyph"><use href="#g-rabbit"/></svg>Conejos</span><input id="rabbits" type="number" min="0"></label>
+        <label class="field"><span class="name"><svg class="glyph"><use href="#g-fox"/></svg>Zorros</span><input id="foxes" type="number" min="0"></label>
+        <label class="field"><span class="name"><svg class="glyph"><use href="#g-rock"/></svg>Rocas</span><input id="rocks" type="number" min="0"></label>
+      </div>
+      <p class="note" id="world-note">El tamaño y las poblaciones vienen del caso elegido.</p>
+    </div>
+
+    <div class="rules">
+      <label class="rule" title="Generaciones que un conejo debe vivir antes de poder reproducirse"><span class="rule-name">Ciclo de reproducción, conejos<code>GEN_PROC_RABBITS</code></span><input id="gen_proc_rabbits" type="number" min="1" max="1000"></label>
+      <label class="rule" title="Generaciones que un zorro debe vivir antes de poder reproducirse"><span class="rule-name">Ciclo de reproducción, zorros<code>GEN_PROC_FOXES</code></span><input id="gen_proc_foxes" type="number" min="1" max="1000"></label>
+      <label class="rule" title="Generaciones que un zorro sobrevive sin comer un conejo"><span class="rule-name">Aguante sin comer, zorros<code>GEN_FOOD_FOXES</code></span><input id="gen_food_foxes" type="number" min="1" max="1000"></label>
+      <label class="rule" title="Cantidad de generaciones de la simulación"><span class="rule-name">Generaciones por simular<code>N_GEN</code></span><input id="n_gen" type="number" min="0" max="100000"></label>
+    </div>
+
+    <div class="launch">
+      <p id="error" class="error" role="alert" hidden></p>
+      <button type="submit" id="start" class="primary">Iniciar</button>
+    </div>
+  </form>
+
+  <section class="stage" aria-label="Simulación">
+    <div class="stage-top">
+      <p id="status" class="status" data-state="idle" role="status"><span class="status-mark" aria-hidden="true"></span><span id="status-text">Sin iniciar</span></p>
+      <ul class="legend" aria-label="Leyenda de la grilla">
+        <li><svg class="glyph"><use href="#g-rabbit"/></svg>Conejo</li>
+        <li><svg class="glyph"><use href="#g-fox"/></svg>Zorro</li>
+        <li><svg class="glyph"><use href="#g-rock"/></svg>Roca</li>
+        <li><span class="glyph empty-cell"></span>Vacío</li>
+      </ul>
+    </div>
+
+    <div class="window" id="window">
+      <canvas id="grid" aria-label="Grilla del ecosistema"></canvas>
+      <p class="invite" id="invite">Elige un mundo y pulsa Iniciar.</p>
+    </div>
+
+    <div class="transport">
+      <button type="button" id="pause" class="pause" disabled><span id="pause-icon" class="icon" aria-hidden="true"></span><span id="pause-text">Pausa</span></button>
+      <div class="speed" role="group" aria-label="Velocidad">
+        <button type="button" id="slower">Más lento</button>
+        <output id="speed"><b id="speed-value">50</b> gen/s<small id="speed-real"></small></output>
+        <button type="button" id="faster">Más rápido</button>
+      </div>
+      <div class="progress">
+        <div class="track" id="track" role="progressbar" aria-label="Progreso de la simulación" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="bar"></i></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="readings" aria-label="Estadísticas">
+    <div class="clock">
+      <span class="clock-label">Generación</span>
+      <output id="gen" class="clock-value">0</output>
+      <span class="clock-total" id="gen-total">aún sin simulación</span>
+      <span class="clock-world" id="world-label"></span>
+    </div>
+
+    <dl class="counts">
+      <div><dt><svg class="glyph"><use href="#g-rabbit"/></svg>Conejos</dt><dd id="count-rabbits">0</dd></div>
+      <div><dt><svg class="glyph"><use href="#g-fox"/></svg>Zorros</dt><dd id="count-foxes">0</dd></div>
+      <div><dt><svg class="glyph"><use href="#g-rock"/></svg>Rocas</dt><dd id="count-rocks">0</dd></div>
+    </dl>
+
+    <figure class="chart">
+      <figcaption>
+        <span class="chart-title">Población en el tiempo</span>
+        <span class="chart-key" id="chart-key"><i class="line rabbit"></i>Conejos <i class="line fox"></i>Zorros</span>
+      </figcaption>
+      <div class="chart-box" id="chart-box"><canvas id="chart" aria-label="Gráfica de conejos y zorros por generación"></canvas><p class="chart-empty" id="chart-empty">La gráfica se dibuja al iniciar.</p></div>
+    </figure>
+  </aside>
+
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
