@@ -16,5 +16,10 @@ target_include_directories(core PUBLIC engine)
 add_executable(eco_seq engine/main_seq.cpp engine/sim_seq.cpp)
 target_link_libraries(eco_seq core)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+add_executable(eco_pth engine/main_pth.cpp engine/sim_pth.cpp)
+target_link_libraries(eco_pth core Threads::Threads)
+
 add_executable(rules_test tests/rules_test.cpp)
 target_link_libraries(rules_test core)

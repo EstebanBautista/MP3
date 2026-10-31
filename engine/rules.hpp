@@ -139,6 +139,20 @@ inline Cell newborn(uint8_t kind) {
     return c;
 }
 
+// What each cell of the old grid leaves in the new one when it holds an animal that does not act in
+// the subphase. Rocks and foxes never compete with a rabbit for a cell in the rabbit subphase, since
+// rabbits only move to empty cells, so they are copied.
+inline void carryRabbitSubphase(Cell& dst, const Cell& c) {
+    if (c.kind == ROCK || c.kind == FOX) dst = c;
+}
+
+// A surviving rabbit goes through mergeRabbit because a fox may have eaten it already: this way it
+// can never overwrite that fox, whichever is delivered first.
+inline void carryFoxSubphase(Cell& dst, const Cell& c) {
+    if (c.kind == RABBIT) mergeRabbit(dst, c);
+    else if (c.kind == ROCK) dst = c;
+}
+
 // Delivery of a whole move to the new grid, for callers with no cell shared between threads. The
 // child's cell is the one the parent left, which no other animal can target in this subphase.
 inline void applyRabbitMove(const World& w, Cell* dst, const Move& m, int x, int y) {

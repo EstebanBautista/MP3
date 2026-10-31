@@ -1,6 +1,7 @@
 // Native tests of rules.hpp, run by tests/test_edge_cases.py. Exit code 0 means all passed.
 #include <cstdio>
 
+#include "bands.hpp"
 #include "rules.hpp"
 
 static int failures = 0;
@@ -145,6 +146,110 @@ static void testFoxDecisions() {
     CHECK(same(w.at(w.next, 0, 1), make(FOX, 0, 0)));
 }
 
+// Carrying is what keeps a rabbit from overwriting a fox that arrived first, in any order.
+static void testCarryRules() {
+    const Cell rock = make(ROCK, 0, 0);
+    const Cell fox = make(FOX, 2, 1);
+    const Cell rabbit = make(RABBIT, 3, 0);
+
+    Cell d{};
+    carryRabbitSubphase(d, rock);
+    CHECK(same(d, rock));
+    d = Cell{};
+    carryRabbitSubphase(d, fox);
+    CHECK(same(d, fox));
+    d = Cell{};
+    carryRabbitSubphase(d, Cell{});
+    CHECK(d.kind == EMPTY);
+
+    d = Cell{};
+    carryFoxSubphase(d, rock);
+    CHECK(same(d, rock));
+    d = Cell{};
+    carryFoxSubphase(d, rabbit);
+    CHECK(same(d, rabbit));
+    d = fox;
+    carryFoxSubphase(d, rabbit);
+    CHECK(same(d, fox));
+    d = Cell{};
+    carryFoxSubphase(d, rabbit);
+    mergeFox(d, fox);
+    CHECK(same(d, fox));
+}
+
+static void checkBands(int rows, int threads) {
+    Band bands[64];
+    staticBands(rows, threads, bands);
+    int next = 0, largest = 0, smallest = rows;
+    for (int t = 0; t < threads; t++) {
+        CHECK(bands[t].first == next);
+        CHECK(bands[t].last >= bands[t].first);
+        next = bands[t].last;
+        const int size = bands[t].last - bands[t].first;
+        if (size > largest) largest = size;
+        if (size < smallest) smallest = size;
+    }
+    CHECK(next == rows);
+    CHECK(largest - smallest <= 1);
+
+    int owner[512];
+    fillRowOwners(bands, threads, owner);
+    for (int t = 0; t < threads; t++)
+        for (int x = bands[t].first; x < bands[t].last; x++) CHECK(owner[x] == t);
+}
+
+static void testStaticBands() {
+    checkBands(5, 16);
+    checkBands(100, 1);
+    checkBands(100, 8);
+    checkBands(101, 8);
+    checkBands(16, 16);
+    checkBands(1, 2);
+    Band three[3];
+    staticBands(2, 3, three);
+    CHECK(three[2].first == three[2].last);
+}
+
+// Bands cut at arbitrary points, with empty ones anywhere, must also work.
+static void testRowOwnersWithUnevenBands() {
+    const Band bands[4] = {{0, 0}, {0, 3}, {3, 3}, {3, 4}};
+    int owner[4];
+    fillRowOwners(bands, 4, owner);
+    CHECK(owner[0] == 1 && owner[1] == 1 && owner[2] == 1 && owner[3] == 3);
+}
+
+static void testMoveBoxGrowsWithoutLosingElements() {
+    MoveBox box{};
+    CHECK(box.items == nullptr && box.count == 0 && box.capacity == 0);
+    const int total = 100000;
+    int lastCapacity = 0;
+    int growths = 0;
+    for (int i = 0; i < total; i++) {
+        pushMove(box, i, -i, make(FOX, i, i + 1));
+        if (box.capacity != lastCapacity) {
+            lastCapacity = box.capacity;
+            growths++;
+        }
+        CHECK(box.count == i + 1);
+        CHECK(box.capacity >= box.count);
+    }
+    CHECK(growths > 1);
+    bool intact = true;
+    for (int i = 0; i < total; i++) {
+        const MoveBox::Move& m = box.items[i];
+        intact = intact && m.x == i && m.y == -i && same(m.cell, make(FOX, i, i + 1));
+    }
+    CHECK(intact);
+
+    // Capacity is kept between uses.
+    const int capacity = box.capacity;
+    box.count = 0;
+    pushMove(box, 7, 8, make(RABBIT, 1, 0));
+    CHECK(box.capacity == capacity && box.count == 1 && box.items[0].x == 7);
+    freeMoveBox(box);
+    CHECK(box.items == nullptr && box.count == 0 && box.capacity == 0);
+}
+
 int main() {
     testMergeOrderIndependence();
     testMergeWinners();
@@ -152,6 +257,10 @@ int main() {
     testProcreatingRabbitLosesConflict();
     testAgeHasNoCap();
     testFoxDecisions();
+    testCarryRules();
+    testStaticBands();
+    testRowOwnersWithUnevenBands();
+    testMoveBoxGrowsWithoutLosingElements();
     if (failures) printf("%d failures\n", failures);
     return failures ? 1 : 0;
 }

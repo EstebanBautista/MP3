@@ -15,7 +15,7 @@ void rabbitSubphase(World& w, int gen) {
         for (int y = 0; y < w.cfg.cols; y++) {
             const Cell& c = w.at(w.cur, x, y);
             if (c.kind == RABBIT) applyRabbitMove(w, w.next, decideRabbit(w, w.cur, gen, x, y), x, y);
-            else if (c.kind != EMPTY) w.at(w.next, x, y) = c;
+            else carryRabbitSubphase(w.at(w.next, x, y), c);
         }
     w.swapGrids();
 }
@@ -26,8 +26,7 @@ void foxSubphase(World& w, int gen) {
         for (int y = 0; y < w.cfg.cols; y++) {
             const Cell& c = w.at(w.cur, x, y);
             if (c.kind == FOX) applyFoxMove(w, w.next, decideFox(w, w.cur, gen, x, y), x, y);
-            else if (c.kind == RABBIT) mergeRabbit(w.at(w.next, x, y), c);  // A fox may have eaten it.
-            else if (c.kind == ROCK) w.at(w.next, x, y) = c;
+            else carryFoxSubphase(w.at(w.next, x, y), c);
         }
     w.swapGrids();
 }

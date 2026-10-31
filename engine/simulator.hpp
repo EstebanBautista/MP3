@@ -28,3 +28,12 @@ public:
     void run(World& w, int threads, Observer* obs) override;
     int threadsUsed(int) const override { return 1; }
 };
+
+class PthSimulator final : public Simulator {
+public:
+    void run(World& w, int threads, Observer* obs) override;
+    double imbalance() const override { return imbalance_; }
+
+private:
+    double imbalance_ = 1.0;
+};
