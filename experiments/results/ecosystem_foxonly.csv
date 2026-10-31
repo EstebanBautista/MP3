@@ -1,0 +1,5 @@
+gpf,gff,foxes_gen0,foxes_gen10,foxes_gen20,foxes_gen50,foxes_gen500,foxes_gen2999,extinct_foxes_gen,file
+5,10,150,142,262,248,143,72,,r0_f150_k500_pr3_pf5_hf10_n3000_s1.csv
+10,10,150,0,0,0,0,0,10,r0_f150_k500_pr3_pf10_hf10_n3000_s1.csv
+20,10,150,0,0,0,0,0,10,r0_f150_k500_pr3_pf20_hf10_n3000_s1.csv
+9,6,150,0,0,0,0,0,6,r0_f150_k500_pr3_pf9_hf6_n3000_s1.csv

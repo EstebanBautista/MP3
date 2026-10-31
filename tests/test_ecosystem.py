@@ -4,8 +4,10 @@ import random
 import sys
 import unittest
 
+import numpy as np
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "experiments"))
-from ecosystem_runs import analyze, CYCLE_THRESHOLD  # noqa: E402
+from ecosystem_runs import analyze, remove_fast, CYCLE_THRESHOLD  # noqa: E402
 
 
 def make(n, rabbit, fox):
@@ -75,7 +77,61 @@ class TestAnalyze(unittest.TestCase):
         self.assertIsNone(out["rabbit_period"])
         self.assertIsNone(out["fox_period"])
 
-    def test_threshold_is_documented_constant(self):
+    def test_analyze_weak_cycle_near_fast_fold_period(self):
+        # Exact fast patterns of periods 4 and 21 (fold 84) plus a slow cycle of period 90, close to
+        # the fold, at only 6% of the mean: the phase-mean subtraction must not cancel it.
+        def rabbit(t):
+            return 1500 * (1 + 0.06 * math.sin(2 * math.pi * t / 90)) + 300 * ((t % 4) - 1.5)
+
+        def fox(t):
+            return 500 * (1 + 0.06 * math.sin(2 * math.pi * (t - 22) / 90)) + 20 * ((t % 21) - 10)
+        out = analyze(make(10000, rabbit, fox))
+        self.assertEqual((out["rabbit_raw_period"], out["fox_raw_period"]), (4, 21))
+        self.assertEqual(out["fold"], 84)
+        self.assertAlmostEqual(out["rabbit_period"], 90, delta=4)
+        self.assertAlmostEqual(out["fox_period"], 90, delta=4)
+        self.assertAlmostEqual(out["fox_lag"], 22, delta=3)
+        self.assertEqual(out["cycle_grade"], "weak")  # amplitude 6% of the mean is below STRONG_AMP
+
+    def test_analyze_large_cycle_is_graded_strong(self):
+        out = analyze(make(3000, sine(1000, 300, 100), sine(300, 100, 100, shift=25)))
+        self.assertEqual(out["cycle_grade"], "strong")
+        self.assertGreater(out["rabbit_amp"], 0.1)
+
+    def test_analyze_no_cycle_grade_none(self):
+        self.assertEqual(analyze([(t, 100, 30) for t in range(2000)])["cycle_grade"], "none")
+
+    def test_analyze_red_noise_is_not_a_cycle(self):
+        # Slowly wandering series (AR(1), phi = 0.99): autocorrelation decays but never oscillates. In 150 trials of this
+        # generator, 0 gave a false cycle at 10000 generations and 4% at 6000 (see the findings).
+        for seed in range(5):
+            rng = random.Random(seed)
+            r = f = 0.0
+            series = []
+            for t in range(10000):
+                r = 0.99 * r + rng.gauss(0, 10)
+                f = 0.99 * f + rng.gauss(0, 5)
+                series.append((t, round(1000 + r), round(300 + f)))
+            out = analyze(series)
+            self.assertIsNone(out["rabbit_period"], seed)
+            self.assertIsNone(out["fox_period"], seed)
+
+    def test_remove_fast_removes_the_pattern_and_keeps_the_mean(self):
+        gens = np.arange(2000)
+        x = 100.0 + 20 * ((gens % 4) - 1.5) + 5 * ((gens % 21) - 10)
+        y, fold = remove_fast(x, gens, [4, 21])
+        self.assertEqual(fold, 84)
+        self.assertLess(np.std(y), 1e-9)
+        self.assertAlmostEqual(float(y.mean()), float(x.mean()))
+
+    def test_threshold_decides_what_is_a_cycle(self):
+        # The same series is a cycle at a low threshold and not at one above its peak.
+        series = make(4000, lambda t: 1000 + 40 * math.sin(2 * math.pi * t / 100) + random.Random(t).gauss(0, 60),
+                      lambda t: 300 + 10 * math.sin(2 * math.pi * t / 100) + random.Random(t + 1).gauss(0, 15))
+        low = analyze(series, threshold=0.05)
+        high = analyze(series, threshold=0.99)
+        self.assertAlmostEqual(low["rabbit_period"], 100, delta=3)
+        self.assertIsNone(high["rabbit_period"])
         self.assertTrue(0 < CYCLE_THRESHOLD < 1)
 
 
