@@ -1,42 +1,65 @@
-NOTE ON THIS FILE: libgomp (GCC OpenMP runtime) is not instrumented, so TSan cannot see the
-happens-before edges of "#pragma omp barrier" and of the implicit barrier at the end of
-"#pragma omp single". Every warning below is between two accesses to the same data that the code
-separates with one of those barriers, so they are expected false positives, not engine races:
-  - staticBands/fillRowOwners (written in omp single) vs reads in fillRowCosts, adaptiveBands,
-    clearBand, chooseNeighbor: ordered by the implicit barrier of the single (sim_omp.cpp:111-116).
-  - fillRowCosts (every thread) vs adaptiveBands/fillRowOwners (thread 0) vs sim_omp.cpp:40 and the
-    later reads of bands/rowOwner: ordered by the two barriers inside rebalance().
-  - clearBand vs fillRowCosts/chooseNeighbor, pushMove/realloc vs inboundPass, mergeRabbit and
-    writeDump: ordered by the barrier that ends each pass of simulate().
-In all 4 runs the output is identical to the sequential one. TSan deduplicates by stack, so a real race
-could in theory hide behind these reports; for that reason the same runs were repeated with Archer,
-which models the OpenMP barriers, in tsan_omp_archer.txt: 0 warnings in 4 of 4 runs. The claim
-supported is "no race observed in those runs", not absence of races.
-
-Command: same docker command as tsan_pth.txt (this file is written by the same run).
-
 ThreadSanitizer evidence: openmp
-date: 2026-10-31T20:15:49Z
+date: 2026-10-31T20:39:12Z
 image: gcc:14
-gcc: g++ (GCC) 14.4.0
+compiler: g++ (GCC) 14.4.0
+OMP_TOOL_LIBRARIES=
 kernel: Linux 6.18.54.1-microsoft-standard-WSL2, vm.mmap_rnd_bits=32
 cpus: 16
 build: g++ -std=c++17 -fsanitize=thread -g -O1 -Wall -Wextra -Iengine (openmp), not static
 TSAN_OPTIONS=halt_on_error=0 exitcode=66 second_deadlock_stack=1
 unbal01 generations: 200 (original input has 10000)
+schedule: default (adaptive for OpenMP, REBALANCE_EVERY=50 in engine/simulator.hpp)
+
+EXPECTED RESULT OF THIS SECTION: TSan warnings. libgomp (GCC OpenMP runtime) is not
+instrumented, so TSan cannot see the happens-before edges of 'omp barrier' and of the
+implicit barrier of 'omp single'. These warnings are false positives caused by that, not
+engine races. The same runs with Archer, which models the OpenMP barriers, are in the
+Archer evidence file and must have 0 warnings. This section fails only if a run crashes
+or its output differs from the sequential output.
 
 --- eco_omp --threads 4 < input 20x20
-exit code: 66; TSan warnings: 115; output identical to sequential: yes
+exit code: 66; TSan warnings: 113; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+       15 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:90 in mergeRabbit(Cell&, Cell const&)
+        9 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:96 in mergeFox(Cell&, Cell const&)
+        8 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:89 in mergeRabbit(Cell&, Cell const&)
+        8 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:53 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+        8 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        8 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:117 in pushMove(MoveBox&, int, int, Cell const&)
+        6 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:61 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+        6 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:203 in clearBand(World const&, Cell*, Band const&)
+        5 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:126 in decideFox(World const&, Cell const*, int, int, int)
+        5 SUMMARY: ThreadSanitizer: data race engine/cli.cpp:222 in writeDump
+        4 SUMMARY: ThreadSanitizer: data race engine/cli.cpp:231 in writeDump
+        3 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:133 in decideFox(World const&, Cell const*, int, int, int)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:242 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:104 in pushMove(MoveBox&, int, int, Cell const&)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:74 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:123 in freeMoveBox(MoveBox&)
+        1 SUMMARY: ThreadSanitizer: data race engine/sim_omp.cpp:40 in rebalance
+        1 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:95 in mergeFox(Cell&, Cell const&)
+        1 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:94 in mergeFox(Cell&, Cell const&)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:82 in fillRowOwners(Band const*, int, int*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:48 in adaptiveBands(int const*, int, int, Band*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:40 in adaptiveBands(int const*, int, int, Band*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:242 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:238 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:157 in maxOverMean(double const*, int)
+first 120 lines of the log:
 ==================
-WARNING: ThreadSanitizer: data race (pid=130)
-  Read of size 4 at 0x720800000038 by thread T3:
+WARNING: ThreadSanitizer: data race (pid=166)
+  Read of size 4 at 0x720800000028 by thread T1:
     #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:69 (eco_omp+0x40475c)
     #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x40475c)
     #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x40475c)
     #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x40475c)
     #4 <null> <null> (libgomp.so.1+0x2174d)
 
-  Previous write of size 4 at 0x720800000038 by thread T1:
+  Previous write of size 4 at 0x720800000028 by thread T2:
     #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
     #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
     #2 <null> <null> (libgomp.so.1+0x2174d)
@@ -48,13 +71,13 @@ WARNING: ThreadSanitizer: data race (pid=130)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T3 (tid=134, running) created by main thread at:
+  Thread T1 (tid=168, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T1 (tid=132, running) created by main thread at:
+  Thread T2 (tid=169, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -63,7 +86,7 @@ WARNING: ThreadSanitizer: data race (pid=130)
 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=130)
+WARNING: ThreadSanitizer: data race (pid=166)
   Read of size 4 at 0x720800000020 by main thread:
     #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:69 (eco_omp+0x40475c)
     #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x40475c)
@@ -73,7 +96,7 @@ WARNING: ThreadSanitizer: data race (pid=130)
     #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Previous write of size 4 at 0x720800000020 by thread T1:
+  Previous write of size 4 at 0x720800000020 by thread T2:
     #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
     #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
     #2 <null> <null> (libgomp.so.1+0x2174d)
@@ -85,7 +108,7 @@ WARNING: ThreadSanitizer: data race (pid=130)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T1 (tid=132, running) created by main thread at:
+  Thread T2 (tid=169, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -94,8 +117,8 @@ WARNING: ThreadSanitizer: data race (pid=130)
 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=130)
-  Read of size 4 at 0x7fffffffe698 by main thread:
+WARNING: ThreadSanitizer: data race (pid=166)
+  Read of size 4 at 0x7fffffffe668 by main thread:
     #0 rebalance engine/sim_omp.cpp:40 (eco_omp+0x4048be)
     #1 simulate engine/sim_omp.cpp:52 (eco_omp+0x4048be)
     #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4048be)
@@ -103,15 +126,15 @@ WARNING: ThreadSanitizer: data race (pid=130)
     #4 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #5 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Previous write of size 4 at 0x7fffffffe698 by thread T1:
+  Previous write of size 4 at 0x7fffffffe668 by thread T2:
     #0 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:114 (eco_omp+0x40518c)
     #1 <null> <null> (libgomp.so.1+0x2174d)
 
   Location is stack of main thread.
 
-  Location is global '<null>' at 0x000000000000 ([stack]+0x20698)
+  Location is global '<null>' at 0x000000000000 ([stack]+0x20668)
 
-  Thread T1 (tid=132, running) created by main thread at:
+  Thread T2 (tid=169, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -120,7 +143,7 @@ WARNING: ThreadSanitizer: data race (pid=130)
 SUMMARY: ThreadSanitizer: data race engine/sim_omp.cpp:40 in rebalance
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=130)
+WARNING: ThreadSanitizer: data race (pid=166)
   Read of size 4 at 0x721400000064 by main thread:
     #0 adaptiveBands(int const*, int, int, Band*) engine/bands.hpp:40 (eco_omp+0x40490c)
     #1 rebalance engine/sim_omp.cpp:40 (eco_omp+0x40490c)
@@ -144,203 +167,54 @@ WARNING: ThreadSanitizer: data race (pid=130)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T1 (tid=132, running) created by main thread at:
+  Thread T1 (tid=168, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:40 in adaptiveBands(int const*, int, int, Band*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=130)
-  Write of size 4 at 0x720800000028 by main thread:
-    #0 adaptiveBands(int const*, int, int, Band*) engine/bands.hpp:48 (eco_omp+0x4049e3)
-    #1 rebalance engine/sim_omp.cpp:40 (eco_omp+0x4049e3)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x4049e3)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4049e3)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 4 at 0x720800000028 by thread T1:
-    #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
-    #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
-    #2 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 32 at 0x720800000020 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 Band* allocateArray<Band>(unsigned long) engine/bands.hpp:135 (eco_omp+0x40543b)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:97 (eco_omp+0x40543b)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T1 (tid=132, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:48 in adaptiveBands(int const*, int, int, Band*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=130)
-  Write of size 4 at 0x721400000000 by main thread:
-    #0 fillRowOwners(Band const*, int, int*) engine/bands.hpp:82 (eco_omp+0x40535e)
-    #1 rebalance engine/sim_omp.cpp:41 (eco_omp+0x40535e)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x40535e)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x40535e)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 4 at 0x721400000000 by thread T1:
-    #0 fillRowOwners(Band const*, int, int*) engine/bands.hpp:82 (eco_omp+0x4052a1)
-    #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:116 (eco_omp+0x4052a1)
-    #2 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 80 at 0x721400000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 int* allocateArray<int>(unsigned long) engine/bands.hpp:135 (eco_omp+0x406f90)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:99 (eco_omp+0x4054c6)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T1 (tid=132, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:82 in fillRowOwners(Band const*, int, int*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=130)
-  Read of size 4 at 0x7260000002c8 by thread T3:
-    #0 void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*) engine/bands.hpp:238 (eco_omp+0x404cd9)
-    #1 simulate engine/sim_omp.cpp:59 (eco_omp+0x404cd9)
-    #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404cd9)
-    #3 <null> <null> (libgomp.so.1+0x2174d)
-
-  Previous write of size 4 at 0x7260000002c8 by thread T2:
-    #0 pushMove(MoveBox&, int, int, Cell const&) engine/bands.hpp:117 (eco_omp+0x405e30)
-    #1 BandSink<&(mergeRabbit(Cell&, Cell const&))>::operator()(int, int, Cell const&) const engine/bands.hpp:191 (eco_omp+0x405e30)
-    #2 void deliverRabbitMove<BandSink<&(mergeRabbit(Cell&, Cell const&))> const&>(Move const&, int, int, BandSink<&(mergeRabbit(Cell&, Cell const&))> const&) engine/rules.hpp:162 (eco_omp+0x405e30)
-    #3 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:214 (eco_omp+0x405e30)
-    #4 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #5 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #6 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 1024 at 0x726000000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::align_val_t, std::nothrow_t const&) <null> (libtsan.so.2+0x9b7d5)
-    #1 MoveBox* allocateArray<MoveBox>(unsigned long) engine/bands.hpp:135 (eco_omp+0x405541)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:101 (eco_omp+0x405541)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T3 (tid=134, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T2 (tid=133, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:238 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=130)
-  Read of size 8 at 0x7260000002c0 by thread T3:
-    #0 void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*) engine/bands.hpp:239 (eco_omp+0x404bf7)
-    #1 simulate engine/sim_omp.cpp:59 (eco_omp+0x404bf7)
-    #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404bf7)
-    #3 <null> <null> (libgomp.so.1+0x2174d)
-
-  Previous write of size 8 at 0x7260000002c0 by thread T2:
-    #0 pushMove(MoveBox&, int, int, Cell const&) engine/bands.hpp:114 (eco_omp+0x4062b5)
-    #1 BandSink<&(mergeRabbit(Cell&, Cell const&))>::operator()(int, int, Cell const&) const engine/bands.hpp:191 (eco_omp+0x4062b5)
-    #2 void deliverRabbitMove<BandSink<&(mergeRabbit(Cell&, Cell const&))> const&>(Move const&, int, int, BandSink<&(mergeRabbit(Cell&, Cell const&))> const&) engine/rules.hpp:162 (eco_omp+0x4062b5)
-    #3 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:214 (eco_omp+0x4062b5)
-    #4 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #5 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #6 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 1024 at 0x726000000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::align_val_t, std::nothrow_t const&) <null> (libtsan.so.2+0x9b7d5)
-    #1 MoveBox* allocateArray<MoveBox>(unsigned long) engine/bands.hpp:135 (eco_omp+0x405541)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:101 (eco_omp+0x405541)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T3 (tid=134, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T2 (tid=133, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=130)
-  Read of size 4 at 0x726400000000 by thread T3:
-    #0 void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*) engine/bands.hpp:240 (eco_omp+0x404c0a)
-    #1 simulate engine/sim_omp.cpp:59 (eco_omp+0x404c0a)
-    #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404c0a)
-    #3 <null> <null> (libgomp.so.1+0x2174d)
-
-  Previous write of size 8 at 0x726400000000 by thread T2:
-    #0 realloc <null> (libtsan.so.2+0x5324d)
-    #1 pushMove(MoveBox&, int, int, Cell const&) engine/bands.hpp:109 (eco_omp+0x4062a1)
-    #2 BandSink<&(mergeRabbit(Cell&, Cell const&))>::operator()(int, int, Cell const&) const engine/bands.hpp:191 (eco_omp+0x4062a1)
-    #3 void deliverRabbitMove<BandSink<&(mergeRabbit(Cell&, Cell const&))> const&>(Move const&, int, int, BandSink<&(mergeRabbit(Cell&, Cell const&))> const&) engine/rules.hpp:162 (eco_omp+0x4062a1)
-    #4 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:214 (eco_omp+0x4062a1)
-    #5 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #6 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #7 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 1280 at 0x726400000000 allocated by thread T2:
-    #0 realloc <null> (libtsan.so.2+0x5324d)
-    #1 pushMove(MoveBox&, int, int, Cell const&) engine/bands.hpp:109 (eco_omp+0x4062a1)
-    #2 BandSink<&(mergeRabbit(Cell&, Cell const&))>::operator()(int, int, Cell const&) const engine/bands.hpp:191 (eco_omp+0x4062a1)
-    #3 void deliverRabbitMove<BandSink<&(mergeRabbit(Cell&, Cell const&))> const&>(Move const&, int, int, BandSink<&(mergeRabbit(Cell&, Cell const&))> const&) engine/rules.hpp:162 (eco_omp+0x4062a1)
-    #4 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:214 (eco_omp+0x4062a1)
-    #5 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #6 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #7 <null> <null> (libgomp.so.1+0x2174d)
-
-  Thread T3 (tid=134, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T2 (tid=133, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-time wall=3.425550 cpu=9.249780 threads=4 imbalance=1.350
+time wall=3.471797 cpu=9.343972 threads=4 imbalance=1.365
 
 --- eco_omp --threads 8 < input 20x20
-exit code: 66; TSan warnings: 137; output identical to sequential: yes
+exit code: 66; TSan warnings: 138; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+       21 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:90 in mergeRabbit(Cell&, Cell const&)
+       14 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:203 in clearBand(World const&, Cell*, Band const&)
+       12 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:96 in mergeFox(Cell&, Cell const&)
+       11 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:89 in mergeRabbit(Cell&, Cell const&)
+        9 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:117 in pushMove(MoveBox&, int, int, Cell const&)
+        8 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:53 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+        8 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        6 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:61 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+        6 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:126 in decideFox(World const&, Cell const*, int, int, int)
+        5 SUMMARY: ThreadSanitizer: data race engine/cli.cpp:222 in writeDump
+        4 SUMMARY: ThreadSanitizer: data race engine/cli.cpp:231 in writeDump
+        4 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:133 in decideFox(World const&, Cell const*, int, int, int)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:104 in pushMove(MoveBox&, int, int, Cell const&)
+        3 SUMMARY: ThreadSanitizer: data race (/usr/local/lib64/libtsan.so.2+0x9b98b) in operator delete[](void*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:74 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:242 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:238 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:123 in freeMoveBox(MoveBox&)
+        1 SUMMARY: ThreadSanitizer: data race engine/sim_omp.cpp:40 in rebalance
+        1 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:94 in mergeFox(Cell&, Cell const&)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:82 in fillRowOwners(Band const*, int, int*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:48 in adaptiveBands(int const*, int, int, Band*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:40 in adaptiveBands(int const*, int, int, Band*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:242 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:157 in maxOverMean(double const*, int)
+first 120 lines of the log:
 ==================
-WARNING: ThreadSanitizer: data race (pid=142)
-  Read of size 4 at 0x721000000048 by thread T1:
+WARNING: ThreadSanitizer: data race (pid=184)
+  Read of size 4 at 0x721000000078 by thread T7:
     #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:69 (eco_omp+0x40475c)
     #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x40475c)
     #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x40475c)
     #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x40475c)
     #4 <null> <null> (libgomp.so.1+0x2174d)
 
-  Previous write of size 4 at 0x721000000048 by thread T7:
+  Previous write of size 4 at 0x721000000078 by thread T6:
     #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
     #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
     #2 <null> <null> (libgomp.so.1+0x2174d)
@@ -352,13 +226,13 @@ WARNING: ThreadSanitizer: data race (pid=142)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T1 (tid=144, running) created by main thread at:
+  Thread T7 (tid=192, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T7 (tid=150, running) created by main thread at:
+  Thread T6 (tid=191, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -367,7 +241,7 @@ WARNING: ThreadSanitizer: data race (pid=142)
 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=142)
+WARNING: ThreadSanitizer: data race (pid=184)
   Read of size 4 at 0x721000000040 by main thread:
     #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:69 (eco_omp+0x40475c)
     #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x40475c)
@@ -377,7 +251,7 @@ WARNING: ThreadSanitizer: data race (pid=142)
     #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Previous write of size 4 at 0x721000000040 by thread T7:
+  Previous write of size 4 at 0x721000000040 by thread T6:
     #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
     #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
     #2 <null> <null> (libgomp.so.1+0x2174d)
@@ -389,7 +263,7 @@ WARNING: ThreadSanitizer: data race (pid=142)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T7 (tid=150, running) created by main thread at:
+  Thread T6 (tid=191, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -398,8 +272,8 @@ WARNING: ThreadSanitizer: data race (pid=142)
 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=142)
-  Read of size 4 at 0x7fffffffe698 by main thread:
+WARNING: ThreadSanitizer: data race (pid=184)
+  Read of size 4 at 0x7fffffffe668 by main thread:
     #0 rebalance engine/sim_omp.cpp:40 (eco_omp+0x4048be)
     #1 simulate engine/sim_omp.cpp:52 (eco_omp+0x4048be)
     #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4048be)
@@ -407,15 +281,15 @@ WARNING: ThreadSanitizer: data race (pid=142)
     #4 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #5 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Previous write of size 4 at 0x7fffffffe698 by thread T7:
+  Previous write of size 4 at 0x7fffffffe668 by thread T6:
     #0 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:114 (eco_omp+0x40518c)
     #1 <null> <null> (libgomp.so.1+0x2174d)
 
   Location is stack of main thread.
 
-  Location is global '<null>' at 0x000000000000 ([stack]+0x20698)
+  Location is global '<null>' at 0x000000000000 ([stack]+0x20668)
 
-  Thread T7 (tid=150, running) created by main thread at:
+  Thread T6 (tid=191, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -424,7 +298,7 @@ WARNING: ThreadSanitizer: data race (pid=142)
 SUMMARY: ThreadSanitizer: data race engine/sim_omp.cpp:40 in rebalance
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=142)
+WARNING: ThreadSanitizer: data race (pid=184)
   Read of size 4 at 0x72140000005c by main thread:
     #0 adaptiveBands(int const*, int, int, Band*) engine/bands.hpp:40 (eco_omp+0x40490c)
     #1 rebalance engine/sim_omp.cpp:40 (eco_omp+0x40490c)
@@ -448,203 +322,48 @@ WARNING: ThreadSanitizer: data race (pid=142)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T1 (tid=144, running) created by main thread at:
+  Thread T1 (tid=186, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:40 in adaptiveBands(int const*, int, int, Band*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=142)
-  Write of size 4 at 0x721000000078 by main thread:
-    #0 adaptiveBands(int const*, int, int, Band*) engine/bands.hpp:48 (eco_omp+0x4049e3)
-    #1 rebalance engine/sim_omp.cpp:40 (eco_omp+0x4049e3)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x4049e3)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4049e3)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 4 at 0x721000000078 by thread T7:
-    #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
-    #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
-    #2 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 64 at 0x721000000040 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 Band* allocateArray<Band>(unsigned long) engine/bands.hpp:135 (eco_omp+0x40543b)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:97 (eco_omp+0x40543b)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T7 (tid=150, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:48 in adaptiveBands(int const*, int, int, Band*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=142)
-  Write of size 4 at 0x721400000000 by main thread:
-    #0 fillRowOwners(Band const*, int, int*) engine/bands.hpp:82 (eco_omp+0x40535e)
-    #1 rebalance engine/sim_omp.cpp:41 (eco_omp+0x40535e)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x40535e)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x40535e)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 4 at 0x721400000000 by thread T7:
-    #0 fillRowOwners(Band const*, int, int*) engine/bands.hpp:82 (eco_omp+0x4052a1)
-    #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:116 (eco_omp+0x4052a1)
-    #2 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 80 at 0x721400000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 int* allocateArray<int>(unsigned long) engine/bands.hpp:135 (eco_omp+0x406f90)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:99 (eco_omp+0x4054c6)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T7 (tid=150, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:82 in fillRowOwners(Band const*, int, int*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=142)
-  Read of size 4 at 0x728000002208 by main thread:
-    #0 void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*) engine/bands.hpp:238 (eco_omp+0x404cd9)
-    #1 simulate engine/sim_omp.cpp:59 (eco_omp+0x404cd9)
-    #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404cd9)
-    #3 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #4 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #5 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 4 at 0x728000002208 by thread T1:
-    #0 pushMove(MoveBox&, int, int, Cell const&) engine/bands.hpp:117 (eco_omp+0x405e30)
-    #1 BandSink<&(mergeRabbit(Cell&, Cell const&))>::operator()(int, int, Cell const&) const engine/bands.hpp:191 (eco_omp+0x405e30)
-    #2 void deliverRabbitMove<BandSink<&(mergeRabbit(Cell&, Cell const&))> const&>(Move const&, int, int, BandSink<&(mergeRabbit(Cell&, Cell const&))> const&) engine/rules.hpp:162 (eco_omp+0x405e30)
-    #3 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:214 (eco_omp+0x405e30)
-    #4 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #5 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #6 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 4096 at 0x728000002000 allocated by main thread:
-    #0 operator new[](unsigned long, std::align_val_t, std::nothrow_t const&) <null> (libtsan.so.2+0x9b7d5)
-    #1 MoveBox* allocateArray<MoveBox>(unsigned long) engine/bands.hpp:135 (eco_omp+0x405541)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:101 (eco_omp+0x405541)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T1 (tid=144, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:238 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=142)
-  Read of size 8 at 0x728000002200 by main thread:
-    #0 void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*) engine/bands.hpp:239 (eco_omp+0x404bf7)
-    #1 simulate engine/sim_omp.cpp:59 (eco_omp+0x404bf7)
-    #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404bf7)
-    #3 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #4 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #5 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 8 at 0x728000002200 by thread T1:
-    #0 pushMove(MoveBox&, int, int, Cell const&) engine/bands.hpp:114 (eco_omp+0x4062b5)
-    #1 BandSink<&(mergeRabbit(Cell&, Cell const&))>::operator()(int, int, Cell const&) const engine/bands.hpp:191 (eco_omp+0x4062b5)
-    #2 void deliverRabbitMove<BandSink<&(mergeRabbit(Cell&, Cell const&))> const&>(Move const&, int, int, BandSink<&(mergeRabbit(Cell&, Cell const&))> const&) engine/rules.hpp:162 (eco_omp+0x4062b5)
-    #3 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:214 (eco_omp+0x4062b5)
-    #4 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #5 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #6 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 4096 at 0x728000002000 allocated by main thread:
-    #0 operator new[](unsigned long, std::align_val_t, std::nothrow_t const&) <null> (libtsan.so.2+0x9b7d5)
-    #1 MoveBox* allocateArray<MoveBox>(unsigned long) engine/bands.hpp:135 (eco_omp+0x405541)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:101 (eco_omp+0x405541)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T1 (tid=144, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=142)
-  Read of size 4 at 0x72640005ff00 by main thread:
-    #0 void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*) engine/bands.hpp:240 (eco_omp+0x404c0a)
-    #1 simulate engine/sim_omp.cpp:59 (eco_omp+0x404c0a)
-    #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404c0a)
-    #3 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #4 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #5 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 8 at 0x72640005ff00 by thread T1:
-    #0 realloc <null> (libtsan.so.2+0x5324d)
-    #1 pushMove(MoveBox&, int, int, Cell const&) engine/bands.hpp:109 (eco_omp+0x4062a1)
-    #2 BandSink<&(mergeRabbit(Cell&, Cell const&))>::operator()(int, int, Cell const&) const engine/bands.hpp:191 (eco_omp+0x4062a1)
-    #3 void deliverRabbitMove<BandSink<&(mergeRabbit(Cell&, Cell const&))> const&>(Move const&, int, int, BandSink<&(mergeRabbit(Cell&, Cell const&))> const&) engine/rules.hpp:162 (eco_omp+0x4062a1)
-    #4 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:214 (eco_omp+0x4062a1)
-    #5 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #6 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #7 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 1280 at 0x72640005ff00 allocated by thread T1:
-    #0 realloc <null> (libtsan.so.2+0x5324d)
-    #1 pushMove(MoveBox&, int, int, Cell const&) engine/bands.hpp:109 (eco_omp+0x4062a1)
-    #2 BandSink<&(mergeRabbit(Cell&, Cell const&))>::operator()(int, int, Cell const&) const engine/bands.hpp:191 (eco_omp+0x4062a1)
-    #3 void deliverRabbitMove<BandSink<&(mergeRabbit(Cell&, Cell const&))> const&>(Move const&, int, int, BandSink<&(mergeRabbit(Cell&, Cell const&))> const&) engine/rules.hpp:162 (eco_omp+0x4062a1)
-    #4 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:214 (eco_omp+0x4062a1)
-    #5 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #6 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #7 <null> <null> (libgomp.so.1+0x2174d)
-
-  Thread T1 (tid=144, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=142)
-  Read of size 8 at 0x72640005ff08 by main thread:
-    #0 mergeRabbit(Cell&, Cell const&) engine/rules.hpp:90 (eco_omp+0x404bc9)
-    #1 void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*) engine/sim_omp.cpp:59 (eco_omp+0x404bc9)
-    #2 simulate engine/sim_omp.cpp:59 (eco_omp+0x404bc9)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404bc9)
-time wall=9.373641 cpu=30.638817 threads=8 imbalance=1.227
+time wall=9.530769 cpu=31.103599 threads=8 imbalance=1.212
 
 --- eco_omp --threads 4 < input unbal01
 exit code: 66; TSan warnings: 55; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+       11 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:203 in clearBand(World const&, Cell*, Band const&)
+        7 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:117 in pushMove(MoveBox&, int, int, Cell const&)
+        6 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:53 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+        3 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:89 in mergeRabbit(Cell&, Cell const&)
+        2 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:96 in mergeFox(Cell&, Cell const&)
+        2 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:90 in mergeRabbit(Cell&, Cell const&)
+        2 SUMMARY: ThreadSanitizer: data race engine/cli.cpp:222 in writeDump
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:242 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:123 in freeMoveBox(MoveBox&)
+        1 SUMMARY: ThreadSanitizer: data race engine/sim_omp.cpp:40 in rebalance
+        1 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:61 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+        1 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:112 in decideRabbit(World const&, Cell const*, int, int, int)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:82 in fillRowOwners(Band const*, int, int*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:48 in adaptiveBands(int const*, int, int, Band*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:40 in adaptiveBands(int const*, int, int, Band*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:242 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:157 in maxOverMean(double const*, int)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:104 in pushMove(MoveBox&, int, int, Cell const&)
+first 120 lines of the log:
 ==================
-WARNING: ThreadSanitizer: data race (pid=158)
-  Read of size 4 at 0x720800000028 by thread T1:
+WARNING: ThreadSanitizer: data race (pid=206)
+  Read of size 4 at 0x720800000030 by thread T2:
     #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:69 (eco_omp+0x40475c)
     #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x40475c)
     #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x40475c)
     #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x40475c)
     #4 <null> <null> (libgomp.so.1+0x2174d)
 
-  Previous write of size 4 at 0x720800000028 by thread T3:
+  Previous write of size 4 at 0x720800000030 by thread T1:
     #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
     #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
     #2 <null> <null> (libgomp.so.1+0x2174d)
@@ -656,13 +375,13 @@ WARNING: ThreadSanitizer: data race (pid=158)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T1 (tid=160, running) created by main thread at:
+  Thread T2 (tid=209, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T3 (tid=162, running) created by main thread at:
+  Thread T1 (tid=208, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -671,7 +390,7 @@ WARNING: ThreadSanitizer: data race (pid=158)
 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=158)
+WARNING: ThreadSanitizer: data race (pid=206)
   Read of size 4 at 0x720800000020 by main thread:
     #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:69 (eco_omp+0x40475c)
     #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x40475c)
@@ -681,7 +400,7 @@ WARNING: ThreadSanitizer: data race (pid=158)
     #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Previous write of size 4 at 0x720800000020 by thread T3:
+  Previous write of size 4 at 0x720800000020 by thread T1:
     #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
     #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
     #2 <null> <null> (libgomp.so.1+0x2174d)
@@ -693,7 +412,7 @@ WARNING: ThreadSanitizer: data race (pid=158)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T3 (tid=162, running) created by main thread at:
+  Thread T1 (tid=208, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -702,8 +421,8 @@ WARNING: ThreadSanitizer: data race (pid=158)
 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=158)
-  Read of size 4 at 0x7fffffffe698 by main thread:
+WARNING: ThreadSanitizer: data race (pid=206)
+  Read of size 4 at 0x7fffffffe668 by main thread:
     #0 rebalance engine/sim_omp.cpp:40 (eco_omp+0x4048be)
     #1 simulate engine/sim_omp.cpp:52 (eco_omp+0x4048be)
     #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4048be)
@@ -711,15 +430,15 @@ WARNING: ThreadSanitizer: data race (pid=158)
     #4 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #5 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Previous write of size 4 at 0x7fffffffe698 by thread T3:
+  Previous write of size 4 at 0x7fffffffe668 by thread T1:
     #0 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:114 (eco_omp+0x40518c)
     #1 <null> <null> (libgomp.so.1+0x2174d)
 
   Location is stack of main thread.
 
-  Location is global '<null>' at 0x000000000000 ([stack]+0x20698)
+  Location is global '<null>' at 0x000000000000 ([stack]+0x20668)
 
-  Thread T3 (tid=162, running) created by main thread at:
+  Thread T1 (tid=208, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -728,7 +447,7 @@ WARNING: ThreadSanitizer: data race (pid=158)
 SUMMARY: ThreadSanitizer: data race engine/sim_omp.cpp:40 in rebalance
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=158)
+WARNING: ThreadSanitizer: data race (pid=206)
   Read of size 4 at 0x724c00000224 by main thread:
     #0 adaptiveBands(int const*, int, int, Band*) engine/bands.hpp:40 (eco_omp+0x40490c)
     #1 rebalance engine/sim_omp.cpp:40 (eco_omp+0x40490c)
@@ -752,203 +471,52 @@ WARNING: ThreadSanitizer: data race (pid=158)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T1 (tid=160, running) created by main thread at:
+  Thread T1 (tid=208, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:40 in adaptiveBands(int const*, int, int, Band*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=158)
-  Write of size 4 at 0x720800000038 by main thread:
-    #0 adaptiveBands(int const*, int, int, Band*) engine/bands.hpp:48 (eco_omp+0x4049e3)
-    #1 rebalance engine/sim_omp.cpp:40 (eco_omp+0x4049e3)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x4049e3)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4049e3)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 4 at 0x720800000038 by thread T3:
-    #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
-    #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
-    #2 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 32 at 0x720800000020 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 Band* allocateArray<Band>(unsigned long) engine/bands.hpp:135 (eco_omp+0x40543b)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:97 (eco_omp+0x40543b)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T3 (tid=162, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:48 in adaptiveBands(int const*, int, int, Band*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=158)
-  Write of size 4 at 0x724c00000000 by main thread:
-    #0 fillRowOwners(Band const*, int, int*) engine/bands.hpp:82 (eco_omp+0x40535e)
-    #1 rebalance engine/sim_omp.cpp:41 (eco_omp+0x40535e)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x40535e)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x40535e)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 4 at 0x724c00000000 by thread T3:
-    #0 fillRowOwners(Band const*, int, int*) engine/bands.hpp:82 (eco_omp+0x4052a1)
-    #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:116 (eco_omp+0x4052a1)
-    #2 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 400 at 0x724c00000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 int* allocateArray<int>(unsigned long) engine/bands.hpp:135 (eco_omp+0x406f90)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:99 (eco_omp+0x4054c6)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T3 (tid=162, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:82 in fillRowOwners(Band const*, int, int*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=158)
-  Write of size 8 at 0x72d00000dc50 by thread T2:
-    #0 clearBand(World const&, Cell*, Band const&) engine/bands.hpp:203 (eco_omp+0x4063c2)
-    #1 foxLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:223 (eco_omp+0x4063c2)
-    #2 simulate engine/sim_omp.cpp:64 (eco_omp+0x404d89)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404d89)
-    #4 <null> <null> (libgomp.so.1+0x2174d)
-
-  Previous read of size 1 at 0x72d00000dc50 by thread T1:
-    #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:72 (eco_omp+0x4047d0)
-    #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x4047d0)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x4047d0)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4047d0)
-    #4 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 120000 at 0x72d000000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 World::init(Config const&) engine/world.cpp:19 (eco_omp+0x402596)
-    #2 readWorld(_IO_FILE*, World&, char*, unsigned long) engine/io.cpp:31 (eco_omp+0x4029c7)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:269 (eco_omp+0x403dff)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T2 (tid=161, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T1 (tid=160, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:203 in clearBand(World const&, Cell*, Band const&)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=158)
-  Write of size 8 at 0x72d000005dc0 by thread T1:
-    #0 clearBand(World const&, Cell*, Band const&) engine/bands.hpp:203 (eco_omp+0x4063c2)
-    #1 foxLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:223 (eco_omp+0x4063c2)
-    #2 simulate engine/sim_omp.cpp:64 (eco_omp+0x404d89)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404d89)
-    #4 <null> <null> (libgomp.so.1+0x2174d)
-
-  Previous read of size 1 at 0x72d000005dc0 by main thread:
-    #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:72 (eco_omp+0x4047d0)
-    #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x4047d0)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x4047d0)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4047d0)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Location is heap block of size 120000 at 0x72d000000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 World::init(Config const&) engine/world.cpp:19 (eco_omp+0x402596)
-    #2 readWorld(_IO_FILE*, World&, char*, unsigned long) engine/io.cpp:31 (eco_omp+0x4029c7)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:269 (eco_omp+0x403dff)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T1 (tid=160, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:203 in clearBand(World const&, Cell*, Band const&)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=158)
-  Read of size 1 at 0x72d000025dc0 by main thread:
-    #0 chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&) engine/rules.hpp:61 (eco_omp+0x406506)
-    #1 decideFox(World const&, Cell const*, int, int, int) engine/rules.hpp:122 (eco_omp+0x406506)
-    #2 foxLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:227 (eco_omp+0x406506)
-    #3 simulate engine/sim_omp.cpp:64 (eco_omp+0x404d89)
-    #4 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404d89)
-    #5 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #6 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #7 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 8 at 0x72d000025dc0 by thread T1:
-    #0 clearBand(World const&, Cell*, Band const&) engine/bands.hpp:203 (eco_omp+0x405a38)
-    #1 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:210 (eco_omp+0x405a38)
-    #2 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #4 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 120000 at 0x72d000020000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 World::init(Config const&) engine/world.cpp:20 (eco_omp+0x402608)
-    #2 readWorld(_IO_FILE*, World&, char*, unsigned long) engine/io.cpp:31 (eco_omp+0x4029c7)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:269 (eco_omp+0x403dff)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T1 (tid=160, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/rules.hpp:61 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=158)
-  Read of size 1 at 0x72d0000066b4 by main thread:
-    #0 writeDump engine/cli.cpp:222 (eco_omp+0x4033f2)
-    #1 onGeneration engine/cli.cpp:156 (eco_omp+0x4033f2)
-    #2 simulate engine/sim_omp.cpp:73 (eco_omp+0x405052)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405052)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-time wall=1.596197 cpu=2.820568 threads=4 imbalance=1.456
+time wall=1.587522 cpu=2.773389 threads=4 imbalance=1.442
 
 --- eco_omp --threads 8 < input unbal01
-exit code: 66; TSan warnings: 103; output identical to sequential: yes
+exit code: 66; TSan warnings: 102; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+       12 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:90 in mergeRabbit(Cell&, Cell const&)
+       12 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:203 in clearBand(World const&, Cell*, Band const&)
+        9 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:89 in mergeRabbit(Cell&, Cell const&)
+        9 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:117 in pushMove(MoveBox&, int, int, Cell const&)
+        8 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:53 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+        6 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        5 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:96 in mergeFox(Cell&, Cell const&)
+        5 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:61 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+        4 SUMMARY: ThreadSanitizer: data race engine/cli.cpp:222 in writeDump
+        4 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race engine/cli.cpp:231 in writeDump
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:242 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:104 in pushMove(MoveBox&, int, int, Cell const&)
+        2 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:126 in decideFox(World const&, Cell const*, int, int, int)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
+        2 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:123 in freeMoveBox(MoveBox&)
+        1 SUMMARY: ThreadSanitizer: data race engine/sim_omp.cpp:40 in rebalance
+        1 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:94 in mergeFox(Cell&, Cell const&)
+        1 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:133 in decideFox(World const&, Cell const*, int, int, int)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:82 in fillRowOwners(Band const*, int, int*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:74 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:48 in adaptiveBands(int const*, int, int, Band*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:40 in adaptiveBands(int const*, int, int, Band*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        1 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:157 in maxOverMean(double const*, int)
+        1 SUMMARY: ThreadSanitizer: data race (/usr/local/lib64/libtsan.so.2+0x53d20) in free
+first 120 lines of the log:
 ==================
-WARNING: ThreadSanitizer: data race (pid=170)
-  Read of size 4 at 0x721000000048 by thread T1:
+WARNING: ThreadSanitizer: data race (pid=224)
+  Read of size 4 at 0x721000000050 by thread T2:
     #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:69 (eco_omp+0x40475c)
     #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x40475c)
     #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x40475c)
     #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x40475c)
     #4 <null> <null> (libgomp.so.1+0x2174d)
 
-  Previous write of size 4 at 0x721000000048 by thread T3:
+  Previous write of size 4 at 0x721000000050 by thread T7:
     #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
     #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
     #2 <null> <null> (libgomp.so.1+0x2174d)
@@ -960,13 +528,13 @@ WARNING: ThreadSanitizer: data race (pid=170)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T1 (tid=172, running) created by main thread at:
+  Thread T2 (tid=227, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T3 (tid=174, running) created by main thread at:
+  Thread T7 (tid=232, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -975,7 +543,7 @@ WARNING: ThreadSanitizer: data race (pid=170)
 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=170)
+WARNING: ThreadSanitizer: data race (pid=224)
   Read of size 4 at 0x721000000040 by main thread:
     #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:69 (eco_omp+0x40475c)
     #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x40475c)
@@ -985,7 +553,7 @@ WARNING: ThreadSanitizer: data race (pid=170)
     #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Previous write of size 4 at 0x721000000040 by thread T3:
+  Previous write of size 4 at 0x721000000040 by thread T7:
     #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
     #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
     #2 <null> <null> (libgomp.so.1+0x2174d)
@@ -997,7 +565,7 @@ WARNING: ThreadSanitizer: data race (pid=170)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T3 (tid=174, running) created by main thread at:
+  Thread T7 (tid=232, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -1006,8 +574,8 @@ WARNING: ThreadSanitizer: data race (pid=170)
 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=170)
-  Read of size 4 at 0x7fffffffe698 by main thread:
+WARNING: ThreadSanitizer: data race (pid=224)
+  Read of size 4 at 0x7fffffffe668 by main thread:
     #0 rebalance engine/sim_omp.cpp:40 (eco_omp+0x4048be)
     #1 simulate engine/sim_omp.cpp:52 (eco_omp+0x4048be)
     #2 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4048be)
@@ -1015,15 +583,15 @@ WARNING: ThreadSanitizer: data race (pid=170)
     #4 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #5 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Previous write of size 4 at 0x7fffffffe698 by thread T3:
+  Previous write of size 4 at 0x7fffffffe668 by thread T7:
     #0 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:114 (eco_omp+0x40518c)
     #1 <null> <null> (libgomp.so.1+0x2174d)
 
   Location is stack of main thread.
 
-  Location is global '<null>' at 0x000000000000 ([stack]+0x20698)
+  Location is global '<null>' at 0x000000000000 ([stack]+0x20668)
 
-  Thread T3 (tid=174, running) created by main thread at:
+  Thread T7 (tid=232, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
     #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
@@ -1032,7 +600,7 @@ WARNING: ThreadSanitizer: data race (pid=170)
 SUMMARY: ThreadSanitizer: data race engine/sim_omp.cpp:40 in rebalance
 ==================
 ==================
-WARNING: ThreadSanitizer: data race (pid=170)
+WARNING: ThreadSanitizer: data race (pid=224)
   Read of size 4 at 0x724c000001f4 by main thread:
     #0 adaptiveBands(int const*, int, int, Band*) engine/bands.hpp:40 (eco_omp+0x40490c)
     #1 rebalance engine/sim_omp.cpp:40 (eco_omp+0x40490c)
@@ -1056,189 +624,43 @@ WARNING: ThreadSanitizer: data race (pid=170)
     #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
     #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
 
-  Thread T1 (tid=172, running) created by main thread at:
+  Thread T1 (tid=226, running) created by main thread at:
     #0 pthread_create <null> (libtsan.so.2+0x566a6)
     #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
+time wall=2.988127 cpu=6.424654 threads=8 imbalance=1.671
 
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:40 in adaptiveBands(int const*, int, int, Band*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=170)
-  Write of size 4 at 0x721000000058 by main thread:
-    #0 adaptiveBands(int const*, int, int, Band*) engine/bands.hpp:48 (eco_omp+0x4049e3)
-    #1 rebalance engine/sim_omp.cpp:40 (eco_omp+0x4049e3)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x4049e3)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4049e3)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
+=== distinct SUMMARY lines over all 4 runs of this section (count, complete) ===
+       50 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:90 in mergeRabbit(Cell&, Cell const&)
+       43 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:203 in clearBand(World const&, Cell*, Band const&)
+       33 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:117 in pushMove(MoveBox&, int, int, Cell const&)
+       31 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:89 in mergeRabbit(Cell&, Cell const&)
+       30 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:53 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+       28 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:96 in mergeFox(Cell&, Cell const&)
+       24 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+       18 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:61 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
+       16 SUMMARY: ThreadSanitizer: data race engine/cli.cpp:222 in writeDump
+       13 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:126 in decideFox(World const&, Cell const*, int, int, int)
+       13 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:240 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+       11 SUMMARY: ThreadSanitizer: data race engine/cli.cpp:231 in writeDump
+       10 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:242 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+       10 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:104 in pushMove(MoveBox&, int, int, Cell const&)
+        9 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeFox(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        8 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:69 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
+        8 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:123 in freeMoveBox(MoveBox&)
+        7 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:133 in decideFox(World const&, Cell const*, int, int, int)
+        6 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:239 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        5 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:74 in fillRowCosts(World const&, Cell const*, Band const&, int, int*)
+        4 SUMMARY: ThreadSanitizer: data race engine/sim_omp.cpp:40 in rebalance
+        4 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:82 in fillRowOwners(Band const*, int, int*)
+        4 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:48 in adaptiveBands(int const*, int, int, Band*)
+        4 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:40 in adaptiveBands(int const*, int, int, Band*)
+        4 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:157 in maxOverMean(double const*, int)
+        3 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:94 in mergeFox(Cell&, Cell const&)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:242 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race engine/bands.hpp:238 in void inboundPass<&(mergeRabbit(Cell&, Cell const&))>(BandPlan const&, int, Cell*)
+        3 SUMMARY: ThreadSanitizer: data race (/usr/local/lib64/libtsan.so.2+0x9b98b) in operator delete[](void*)
+        1 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:95 in mergeFox(Cell&, Cell const&)
+        1 SUMMARY: ThreadSanitizer: data race engine/rules.hpp:112 in decideRabbit(World const&, Cell const*, int, int, int)
+        1 SUMMARY: ThreadSanitizer: data race (/usr/local/lib64/libtsan.so.2+0x53d20) in free
 
-  Previous write of size 4 at 0x721000000058 by thread T3:
-    #0 staticBands(int, int, Band*) engine/bands.hpp:27 (eco_omp+0x4051f0)
-    #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:115 (eco_omp+0x4051f0)
-    #2 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 64 at 0x721000000040 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 Band* allocateArray<Band>(unsigned long) engine/bands.hpp:135 (eco_omp+0x40543b)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:97 (eco_omp+0x40543b)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T3 (tid=174, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:48 in adaptiveBands(int const*, int, int, Band*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=170)
-  Write of size 4 at 0x724c00000000 by main thread:
-    #0 fillRowOwners(Band const*, int, int*) engine/bands.hpp:82 (eco_omp+0x40535e)
-    #1 rebalance engine/sim_omp.cpp:41 (eco_omp+0x40535e)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x40535e)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x40535e)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Previous write of size 4 at 0x724c00000000 by thread T3:
-    #0 fillRowOwners(Band const*, int, int*) engine/bands.hpp:82 (eco_omp+0x4052a1)
-    #1 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:116 (eco_omp+0x4052a1)
-    #2 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 400 at 0x724c00000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 int* allocateArray<int>(unsigned long) engine/bands.hpp:135 (eco_omp+0x406f90)
-    #2 OmpSimulator::run(World&, int, Observer*) engine/sim_omp.cpp:99 (eco_omp+0x4054c6)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T3 (tid=174, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:82 in fillRowOwners(Band const*, int, int*)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=170)
-  Write of size 8 at 0x72d00000d7a0 by thread T4:
-    #0 clearBand(World const&, Cell*, Band const&) engine/bands.hpp:203 (eco_omp+0x4063c2)
-    #1 foxLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:223 (eco_omp+0x4063c2)
-    #2 simulate engine/sim_omp.cpp:64 (eco_omp+0x404d89)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404d89)
-    #4 <null> <null> (libgomp.so.1+0x2174d)
-
-  Previous read of size 1 at 0x72d00000d7a0 by thread T3:
-    #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:72 (eco_omp+0x4047d0)
-    #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x4047d0)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x4047d0)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4047d0)
-    #4 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 120000 at 0x72d000000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 World::init(Config const&) engine/world.cpp:19 (eco_omp+0x402596)
-    #2 readWorld(_IO_FILE*, World&, char*, unsigned long) engine/io.cpp:31 (eco_omp+0x4029c7)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:269 (eco_omp+0x403dff)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T4 (tid=175, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T3 (tid=174, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:203 in clearBand(World const&, Cell*, Band const&)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=170)
-  Write of size 8 at 0x72d000002ee0 by thread T1:
-    #0 clearBand(World const&, Cell*, Band const&) engine/bands.hpp:203 (eco_omp+0x4063c2)
-    #1 foxLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:223 (eco_omp+0x4063c2)
-    #2 simulate engine/sim_omp.cpp:64 (eco_omp+0x404d89)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404d89)
-    #4 <null> <null> (libgomp.so.1+0x2174d)
-
-  Previous read of size 1 at 0x72d000002ee0 by main thread:
-    #0 fillRowCosts(World const&, Cell const*, Band const&, int, int*) engine/bands.hpp:72 (eco_omp+0x4047d0)
-    #1 rebalance engine/sim_omp.cpp:35 (eco_omp+0x4047d0)
-    #2 simulate engine/sim_omp.cpp:52 (eco_omp+0x4047d0)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x4047d0)
-    #4 GOMP_parallel <null> (libgomp.so.1+0x17f65)
-    #5 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #6 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Location is heap block of size 120000 at 0x72d000000000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 World::init(Config const&) engine/world.cpp:19 (eco_omp+0x402596)
-    #2 readWorld(_IO_FILE*, World&, char*, unsigned long) engine/io.cpp:31 (eco_omp+0x4029c7)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:269 (eco_omp+0x403dff)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T1 (tid=172, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/bands.hpp:203 in clearBand(World const&, Cell*, Band const&)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=170)
-  Read of size 1 at 0x72d000025dc0 by thread T1:
-    #0 chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&) engine/rules.hpp:61 (eco_omp+0x406506)
-    #1 decideFox(World const&, Cell const*, int, int, int) engine/rules.hpp:122 (eco_omp+0x406506)
-    #2 foxLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:227 (eco_omp+0x406506)
-    #3 simulate engine/sim_omp.cpp:64 (eco_omp+0x404d89)
-    #4 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x404d89)
-    #5 <null> <null> (libgomp.so.1+0x2174d)
-
-  Previous write of size 8 at 0x72d000025dc0 by thread T2:
-    #0 clearBand(World const&, Cell*, Band const&) engine/bands.hpp:203 (eco_omp+0x405a38)
-    #1 rabbitLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:210 (eco_omp+0x405a38)
-    #2 simulate engine/sim_omp.cpp:55 (eco_omp+0x405107)
-    #3 OmpSimulator::run(World&, int, Observer*) [clone ._omp_fn.0] engine/sim_omp.cpp:118 (eco_omp+0x405107)
-    #4 <null> <null> (libgomp.so.1+0x2174d)
-
-  Location is heap block of size 120000 at 0x72d000020000 allocated by main thread:
-    #0 operator new[](unsigned long, std::nothrow_t const&) <null> (libtsan.so.2+0x9b65d)
-    #1 World::init(Config const&) engine/world.cpp:20 (eco_omp+0x402608)
-    #2 readWorld(_IO_FILE*, World&, char*, unsigned long) engine/io.cpp:31 (eco_omp+0x4029c7)
-    #3 engineMain(int, char**, Simulator&) engine/cli.cpp:269 (eco_omp+0x403dff)
-    #4 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T1 (tid=172, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-  Thread T2 (tid=173, running) created by main thread at:
-    #0 pthread_create <null> (libtsan.so.2+0x566a6)
-    #1 <null> <null> (libgomp.so.1+0x21d4e)
-    #2 engineMain(int, char**, Simulator&) engine/cli.cpp:297 (eco_omp+0x40413c)
-    #3 main engine/main_omp.cpp:6 (eco_omp+0x4044de)
-
-SUMMARY: ThreadSanitizer: data race engine/rules.hpp:61 in chooseNeighbor(World const&, Cell const*, int, int, int, unsigned char, int&, int&)
-==================
-==================
-WARNING: ThreadSanitizer: data race (pid=170)
-  Write of size 4 at 0x72d000002a9c by main thread:
-    #0 clearBand(World const&, Cell*, Band const&) engine/bands.hpp:203 (eco_omp+0x4063c2)
-    #1 foxLocalPass(BandPlan const&, int, int, Cell const*, Cell*) engine/bands.hpp:223 (eco_omp+0x4063c2)
-time wall=3.012872 cpu=6.412590 threads=8 imbalance=1.613
-
-overall: FAILURES, see above
+overall: 408 TSan warnings in 4 runs, EXPECTED for this section (uninstrumented libgomp, see the note at the top); outputs identical to sequential in all runs: yes

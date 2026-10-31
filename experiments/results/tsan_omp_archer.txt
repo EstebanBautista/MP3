@@ -1,45 +1,58 @@
 ThreadSanitizer evidence: openmp
-date: 2026-10-31T20:23:07Z
-image: ubuntu:24.04+clang18+libomp-dev
+date: 2026-10-31T20:40:31Z
+image: ubuntu:24.04+clang18+libomp-dev+llvm18
 compiler: Ubuntu clang version 18.1.3 (1ubuntu1)
 OMP_TOOL_LIBRARIES=/usr/lib/llvm-18/lib/libarcher.so
 kernel: Linux 6.18.54.1-microsoft-standard-WSL2, vm.mmap_rnd_bits=32
 cpus: 16
-build: clang++ -std=c++17 -fsanitize=thread -g -O1 -Wall -Wextra -Iengine (openmp), not static
+build: clang++ -std=c++17 -fsanitize=thread -g -O1 -Wall -Wextra -Iengine -fprofile-instr-generate -fcoverage-mapping (openmp), not static
 TSAN_OPTIONS=halt_on_error=0 exitcode=66 second_deadlock_stack=1 ignore_noninstrumented_modules=1
 unbal01 generations: 200 (original input has 10000)
+schedule: default (adaptive for OpenMP, REBALANCE_EVERY=50 in engine/simulator.hpp)
 
 --- eco_omp --threads 4 < input 20x20
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
-time wall=0.032190 cpu=0.044053 threads=4 imbalance=1.073
-time wall=0.032190 cpu=0.044053 threads=4 imbalance=1.073
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.070625 cpu=0.125770 threads=4 imbalance=1.074
+time wall=0.070625 cpu=0.125770 threads=4 imbalance=1.074
 
 --- eco_omp --threads 8 < input 20x20
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
-time wall=0.037380 cpu=0.071215 threads=8 imbalance=1.082
-time wall=0.037380 cpu=0.071215 threads=8 imbalance=1.082
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.078259 cpu=0.248721 threads=8 imbalance=1.048
+time wall=0.078259 cpu=0.248721 threads=8 imbalance=1.048
 
 --- eco_omp --threads 4 < input unbal01
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
-time wall=0.053017 cpu=0.138262 threads=4 imbalance=1.190
-time wall=0.053017 cpu=0.138262 threads=4 imbalance=1.190
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.227360 cpu=0.631760 threads=4 imbalance=1.166
+time wall=0.227360 cpu=0.631760 threads=4 imbalance=1.166
 
 --- eco_omp --threads 8 < input unbal01
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
-time wall=0.048680 cpu=0.255480 threads=8 imbalance=1.167
-time wall=0.048680 cpu=0.255480 threads=8 imbalance=1.167
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.220058 cpu=1.296650 threads=8 imbalance=1.174
+time wall=0.220058 cpu=1.296650 threads=8 imbalance=1.174
 
-overall: no reports and identical outputs so far
+=== distinct SUMMARY lines over all 4 runs of this section (count, complete) ===
+  (none)
 
-Control (same image, same environment variables, 4 threads, tiny program, executed 2026-10-31):
-  with_barrier (each thread writes a[id]=1, '#pragma omp barrier', then reads a[0..3]): rc=0 warnings=0
-  no_barrier   (same program without the barrier):                                       rc=66 warnings=1
-This shows that Archer + TSan still report a missing OpenMP barrier, so the zero above is not
-an artifact of the setup.
+=== source coverage of the same 4 runs (llvm-cov, FNDA = executions of the function) ===
+profile files merged: 4
+Rounds of rebalancing: 20x20 has 1000 gens -> 20, unbal01 has 200 gens -> 4; two thread counts each.
+Expected adaptiveBands calls (thread 0, once per round): 48. Expected rebalance calls (every thread): 288.
+Counters are not atomic, so measured counts of the per-thread functions can be lower.
+  FNDA:52,_Z13fillRowOwnersPK4BandiPi
+  FNDA:235,_Z12fillRowCostsRK5WorldPK4CellRK4BandiPi
+  FNDA:48,_Z13adaptiveBandsPKiiiP4Band
+  FNDA:239,sim_omp.cpp:_ZN12_GLOBAL__N_19rebalanceERNS_4TeamEiR9Stopwatch
 
-Command that produced this file:
-  docker run --rm --security-opt seccomp=unconfined -e TSAN_IMAGE=ubuntu:24.04+clang18+libomp-dev \
-    -e CXX=clang++ -e OMP_TOOL_LIBRARIES=/usr/lib/llvm-18/lib/libarcher.so \
-    -e TSAN_EXTRA=ignore_noninstrumented_modules=1 -e SKIP_PTH=1 \
-    -e OMP_RESULT=experiments/results/tsan_omp_archer.txt -v "$PWD:/src" -w /src ubuntu:24.04 \
-    bash -c 'apt-get update -qq && apt-get install -y -qq clang libomp-dev && bash scripts/tsan.sh'
+overall: 0 TSan warnings in 4 runs, expected 0; outputs identical to sequential in all runs: yes; section PASS
+=== negative control (4-thread program: each thread writes a[id], optional barrier, reads a[0..3]) ===
+  with_barrier: exit code 0, TSan warnings 0
+  no_barrier: exit code 66, TSan warnings 1
+  expected: with_barrier 0 warnings; no_barrier at least 1 (so Archer still detects a missing barrier)
