@@ -32,7 +32,7 @@ from reportlab.platypus import (BaseDocTemplate, Frame, Image, KeepTogether, Nex
                                 PageTemplate, Paragraph, Preformatted, Spacer, Table, TableStyle)
 
 # Fill these in when known. A value that does not start with http stays visible as plain text.
-TEAM = ["[NOMBRE INTEGRANTE 1]", "[NOMBRE INTEGRANTE 2]"]
+TEAM = ["Isabela Gutiérrez Reyes", "Esteban David Muñoz Bautista"]
 VIDEO_URL = "[ENLACE VIDEO]"
 COURSE = "300CIP013 Programación Paralela, 2026-II"
 REPO_URL = "https://github.com/EstebanBautista/MP3"

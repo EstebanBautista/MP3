@@ -82,11 +82,11 @@ Desde la carpeta del proyecto, después de compilar:
 python -m unittest discover -s tests -v
 ```
 
-La suite tiene 239 pruebas. Comparan los tres motores con los casos de la tarea, con 1, 2, 4, 8 y 16 hilos, además de casos límite, la entrada y salida, el servidor web, las mediciones y el informe. No se incluye `ecosystem_examples/allgen100x100` (300 MB, se excluye del repositorio); ninguna prueba lo necesita. Si se agrega, la herramienta `tools/diff_allgen.py` compara dos archivos `allgen`.
+Comparan los tres motores con los casos de la tarea, con 1, 2, 4, 8 y 16 hilos, además de casos límite, la entrada y salida, el servidor web, las mediciones y el informe.
 
 ## Repetir mediciones y experimentos
 
-Las mediciones de tiempo y los experimentos de dinámica de población son reproducibles. Los resultados ya calculados están en `experiments/results/`.
+Los resultados ya calculados están en `experiments/results/`. Para repetirlos:
 
 ```sh
 python experiments/measure.py env --out mi_entorno.txt      # describe el equipo y el compilador
@@ -108,22 +108,7 @@ docker run --rm --security-opt seccomp=unconfined -e TSAN_IMAGE=gcc:14 -v "$PWD:
 
 ## Informe
 
-El informe está en [`docs/report/informe.pdf`](docs/report/informe.pdf) (fuente: [`docs/report/informe.md`](docs/report/informe.md)). Los valores medidos del texto se leen de `experiments/results/` al generarlo.
-
-Para regenerarlo:
-
-```sh
-python docs/report/build_report.py
-```
-
-La generación lee el tamaño de los diseños desde las ramas `diseno-*` o `origin/diseno-*`. Por eso falla desde un ZIP o desde un clon de una sola rama: hace falta un clon con esas ramas.
-
-Antes de la entrega, abra `docs/report/build_report.py` y edite las dos constantes del inicio:
-
-- `TEAM = ["[NOMBRE INTEGRANTE 1]", "[NOMBRE INTEGRANTE 2]"]`: reemplace cada texto con el nombre de un integrante.
-- `VIDEO_URL = "[ENLACE VIDEO]"`: reemplace con el enlace del video.
-
-Luego ejecute de nuevo la orden y revise el PDF.
+El informe está en [`docs/report/informe.pdf`](docs/report/informe.pdf). También se puede leer en GitHub en [`docs/report/informe_vista.md`](docs/report/informe_vista.md).
 
 ## Ramas
 
