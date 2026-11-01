@@ -148,6 +148,19 @@ class TestSource(unittest.TestCase):
         with open(os.path.join(RESULTS, name), encoding="utf-8") as f:
             return re.search(r"^overall: (\d+) TSan warnings", f.read(), re.M).group(1)
 
+    def test_rubric_table_totals_100(self):
+        table = source_text().split(":::table rubrica")[1].split(":::table enunciado")[0]
+        points = [int(n) for n in re.findall(r"^\| .*?\((\d+)\) \|", table, re.M)]
+        self.assertEqual(sum(points), 100)
+
+    def test_adaptive_exceptions_are_stated(self):
+        """Exactly the configurations where adaptive does not lower imbalance are the ones named."""
+        worse = [(c, t) for c in build_report.WIN_CASES for t in (2, 4, 8, 16)
+                 if build_report.perf_metric("win", c, "omp_a", t, "imb")
+                 >= build_report.perf_metric("win", c, "omp_s", t, "imb")]
+        self.assertEqual(worse, [("20x20", 2), ("20x20", 4)])
+        self.assertIn("22 de las 24", source_text())
+
     def test_required_honesty_statements(self):
         text = source_text()
         for phrase in ("no se observaron carreras", "Archer", "libgomp", "no se investigó",

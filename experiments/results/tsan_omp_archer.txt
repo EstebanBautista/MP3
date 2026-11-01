@@ -1,5 +1,5 @@
 ThreadSanitizer evidence: openmp
-date: 2026-10-31T20:40:31Z
+date: 2026-11-01T01:18:27Z
 image: ubuntu:24.04+clang18+libomp-dev+llvm18
 compiler: Ubuntu clang version 18.1.3 (1ubuntu1)
 OMP_TOOL_LIBRARIES=/usr/lib/llvm-18/lib/libarcher.so
@@ -10,49 +10,79 @@ TSAN_OPTIONS=halt_on_error=0 exitcode=66 second_deadlock_stack=1 ignore_noninstr
 unbal01 generations: 200 (original input has 10000)
 schedule: default (adaptive for OpenMP, REBALANCE_EVERY=50 in engine/simulator.hpp)
 
---- eco_omp --threads 4 < input 20x20
+--- eco_omp --threads 4 --dump-all < input 20x20 (mode: dump)
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
 distinct SUMMARY lines (count of each, complete list):
 first 120 lines of the log:
-time wall=0.070625 cpu=0.125770 threads=4 imbalance=1.074
-time wall=0.070625 cpu=0.125770 threads=4 imbalance=1.074
+time wall=0.165925 cpu=0.482962 threads=4 imbalance=1.049
+time wall=0.165925 cpu=0.482962 threads=4 imbalance=1.049
 
---- eco_omp --threads 8 < input 20x20
+--- eco_omp --threads 8 --dump-all < input 20x20 (mode: dump)
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
 distinct SUMMARY lines (count of each, complete list):
 first 120 lines of the log:
-time wall=0.078259 cpu=0.248721 threads=8 imbalance=1.048
-time wall=0.078259 cpu=0.248721 threads=8 imbalance=1.048
+time wall=0.224949 cpu=1.357656 threads=8 imbalance=1.053
+time wall=0.224949 cpu=1.357656 threads=8 imbalance=1.053
 
---- eco_omp --threads 4 < input unbal01
+--- eco_omp --threads 4 --dump-all < input unbal01 (mode: dump)
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
 distinct SUMMARY lines (count of each, complete list):
 first 120 lines of the log:
-time wall=0.227360 cpu=0.631760 threads=4 imbalance=1.166
-time wall=0.227360 cpu=0.631760 threads=4 imbalance=1.166
+time wall=0.225050 cpu=0.622461 threads=4 imbalance=1.161
+time wall=0.225050 cpu=0.622461 threads=4 imbalance=1.161
 
---- eco_omp --threads 8 < input unbal01
+--- eco_omp --threads 8 --dump-all < input unbal01 (mode: dump)
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
 distinct SUMMARY lines (count of each, complete list):
 first 120 lines of the log:
-time wall=0.220058 cpu=1.296650 threads=8 imbalance=1.174
-time wall=0.220058 cpu=1.296650 threads=8 imbalance=1.174
+time wall=0.221604 cpu=1.347479 threads=8 imbalance=1.169
+time wall=0.221604 cpu=1.347479 threads=8 imbalance=1.169
 
-=== distinct SUMMARY lines over all 4 runs of this section (count, complete) ===
+--- eco_omp --threads 4  < input 20x20 (mode: final)
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.082141 cpu=0.314972 threads=4 imbalance=1.060
+time wall=0.082141 cpu=0.314972 threads=4 imbalance=1.060
+
+--- eco_omp --threads 8  < input 20x20 (mode: final)
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.075370 cpu=0.572874 threads=8 imbalance=1.044
+time wall=0.075370 cpu=0.572874 threads=8 imbalance=1.044
+
+--- eco_omp --threads 4  < input unbal01 (mode: final)
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.216692 cpu=0.856193 threads=4 imbalance=1.161
+time wall=0.216692 cpu=0.856193 threads=4 imbalance=1.161
+
+--- eco_omp --threads 8  < input unbal01 (mode: final)
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.219594 cpu=1.723210 threads=8 imbalance=1.184
+time wall=0.219594 cpu=1.723210 threads=8 imbalance=1.184
+
+=== distinct SUMMARY lines over all 8 runs of this section (count, complete) ===
   (none)
 
-=== source coverage of the same 4 runs (llvm-cov, FNDA = executions of the function) ===
-profile files merged: 4
-Rounds of rebalancing: 20x20 has 1000 gens -> 20, unbal01 has 200 gens -> 4; two thread counts each.
-Expected adaptiveBands calls (thread 0, once per round): 48. Expected rebalance calls (every thread): 288.
-Counters are not atomic, so measured counts of the per-thread functions can be lower.
-  FNDA:52,_Z13fillRowOwnersPK4BandiPi
-  FNDA:235,_Z12fillRowCostsRK5WorldPK4CellRK4BandiPi
-  FNDA:48,_Z13adaptiveBandsPKiiiP4Band
-  FNDA:239,sim_omp.cpp:_ZN12_GLOBAL__N_19rebalanceERNS_4TeamEiR9Stopwatch
+=== distinct pairs of conflicting accesses, top frame of each (count, complete) ===
 
-overall: 0 TSan warnings in 4 runs, expected 0; outputs identical to sequential in all runs: yes; section PASS
+=== source coverage of the same 8 runs (llvm-cov, FNDA = executions of the function) ===
+profile files merged: 8
+Rounds of rebalancing: 20x20 has 1000 gens -> 20, unbal01 has 200 gens -> 4; two thread counts and two modes each.
+Expected adaptiveBands calls (thread 0, once per round): 96. Expected rebalance calls (every thread): 576.
+Counters are not atomic, so measured counts of the per-thread functions can be lower.
+  FNDA:104,_Z13fillRowOwnersPK4BandiPi
+  FNDA:465,_Z12fillRowCostsRK5WorldPK4CellRK4BandiPi
+  FNDA:96,_Z13adaptiveBandsPKiiiP4Band
+  FNDA:475,sim_omp.cpp:_ZN12_GLOBAL__N_19rebalanceERNS_4TeamEiR9Stopwatch
+
+overall: 0 TSan warnings in 8 runs, expected 0; outputs identical to sequential in all runs: yes; section PASS
 === negative control (4-thread program: each thread writes a[id], optional barrier, reads a[0..3]) ===
   with_barrier: exit code 0, TSan warnings 0
-  no_barrier: exit code 66, TSan warnings 1
+  no_barrier: exit code 66, TSan warnings 2
   expected: with_barrier 0 warnings; no_barrier at least 1 (so Archer still detects a missing barrier)

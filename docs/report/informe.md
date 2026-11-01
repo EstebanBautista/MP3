@@ -6,9 +6,9 @@ Este proyecto simula un ecosistema de conejos, zorros y rocas sobre una matriz, 
 
 Los tres diseños producen el mismo resultado que los 7 casos de la tarea, con 1, 2, 4, 8 y 16 hilos. Los resultados principales son estos, y varios no son los que se esperaban:
 
-- **Más hilos no siempre es más rápido.** El paralelismo solo da una aceleración clara en el mundo de 1000x1000: ×{{perf:win:large1000x1000:pth:8:speedup}} con Pthreads y 8 hilos. En 20x20 todos los diseños paralelos son más lentos que el secuencial, y en 100x100 el mejor resultado es ×{{perf:win:100x100:pth:4:speedup}}.
-- **Con un hilo, los motores paralelos cuestan más que el secuencial:** entre {{overr:win}}. No se investigó la causa.
-- **El reparto adaptativo reduce el desequilibrio, pero no da una ganancia clara de tiempo.** Además, los dos casos "unbal" muestran poco desequilibrio incluso con reparto estático.
+- **Más hilos no siempre es más rápido.** En Windows, 1000x1000 es el único mundo con aceleración clara en todos los diseños: ×{{perf:win:large1000x1000:pth:8:speedup}} con Pthreads y 8 hilos. En 20x20 todos los diseños paralelos son más lentos que el secuencial, y en 100x100 el mejor resultado es ×{{perf:win:100x100:pth:4:speedup}}.
+- **Con un hilo, los motores paralelos cuestan más que el secuencial:** de {{overr:win}}. No se investigó la causa.
+- **El reparto adaptativo reduce el desequilibrio en casi todas las configuraciones, con excepciones en 20x20, pero no da una ganancia clara de tiempo.** Además, los dos casos "unbal" muestran poco desequilibrio incluso con reparto estático.
 - **La comparación entre OpenMP y Pthreads depende de la plataforma.** En Windows gana Pthreads; en un contenedor Linux sobre WSL2 se invierte en 200x200, y no se demostró la causa.
 - **Las poblaciones oscilan, pero no con el ciclo lento esperado.** Hay una oscilación rápida con periodo `GEN_PROC`+1 y, con `GEN_PROC_FOXES`=10, una oscilación lenta débil. No se vio ningún ciclo lento fuerte a la sensibilidad del análisis, ni se demostró que lo observado sea una dinámica depredador-presa.
 
@@ -19,34 +19,33 @@ El enunciado de este proyecto no incluye rúbrica. Se usa la de los micro-proyec
 :::table rubrica|6,6,1.4|Dónde está cada criterio de la rúbrica.
 | Criterio | Sección | Página |
 |---|---|---|
-| Implementación de cada diseño (30) | D1: {{ref:d1}}. D2: {{ref:d2}}. D3: {{ref:d3}}. Base común: {{ref:comun}}. Comprobación: {{ref:verif}} | {{page:d1}} |
-| Ventajas y desventajas de cada diseño (20) | {{ref:ventajas}} | {{page:ventajas}} |
-| Preguntas por diseño (20) | {{ref:preguntas}}, una subsección por pregunta | {{page:preguntas}} |
-| Comparación de rendimiento, complejidad y mantenimiento (20) | {{ref:comparacion}}, con los datos de {{ref:rendimiento}} | {{page:comparacion}} |
-| Justificación de decisiones, estructuras y funciones (10) | Subsecciones "Justificación" de {{ref:d1}}, {{ref:d2}} y {{ref:d3}}. Reglas: {{ref:decisiones}} | {{page:decisiones}} |
+| Implementación de cada diseño (30) | D1: {{num:d1}}. D2: {{num:d2}}. D3: {{num:d3}}. Base común: {{num:comun}}. Comprobación: {{num:verif}} | {{page:d1}} |
+| Ventajas y desventajas de cada diseño (20) | {{num:ventajas}} | {{page:ventajas}} |
+| Preguntas y comparación de rendimiento, complejidad y mantenimiento (20) | Preguntas: {{num:preguntas}}, una subsección por pregunta. Comparación: {{num:comparacion}}, con los datos de {{num:rendimiento}} | {{page:preguntas}} |
+| Justificación de decisiones, estructuras y funciones (10) | Subsecciones "Justificación" de {{num:d1}}, {{num:d2}} y {{num:d3}}. Reglas: {{num:decisiones}} | {{page:decisiones}} |
 | Informe y video (20) | Este documento. El enlace al video está en la portada | 1 |
 
 :::table enunciado|6.5,5.5,1.4|Dónde está cada requisito del enunciado y de las reglas de entrega del curso.
 | Requisito | Sección | Página |
 |---|---|---|
-| Reglas de conejos, zorros, rocas, elección de celda y conflictos | {{ref:reglas}} | {{page:reglas}} |
-| Entrada por stdin y salida por stdout en el formato pedido | {{ref:entrada}} | {{page:entrada}} |
-| Versión secuencial primero, luego paralela en memoria compartida | {{ref:d1}}, {{ref:d2}}, {{ref:d3}} | {{page:d1}} |
-| Trabajadores con porción fija y sincronización con vecinos | {{ref:d2}} | {{page:d2}} |
-| Solución adaptativa que balancea la carga | {{ref:d3}} | {{page:d3}} |
-| Grilla, estadísticas, parámetros y controles de tiempo | {{ref:interfaz}} | {{page:interfaz}} |
-| Patrones cíclicos y efecto de los parámetros en la estabilidad | {{ref:eco}} | {{page:eco}} |
-| Tiempo de CPU y tiempo total | {{ref:rendimiento}}, {{ref:tablas}} | {{page:rendimiento}} |
-| Reflexión: más hilos no siempre es más rápido | {{ref:conclusion}} | {{page:conclusion}} |
-| Cada diseño en una rama, repositorio público y enlaces | Portada y {{ref:ramas}} | {{page:ramas}} |
-| Código modular, orientado a objetos, con arreglos y `char*` | {{ref:comun}} | {{page:comun}} |
-| Cómo ejecutar el programa | {{ref:ejecutar}} | {{page:ejecutar}} |
+| Reglas de conejos, zorros, rocas, elección de celda y conflictos | {{num:reglas}} | {{page:reglas}} |
+| Entrada por stdin y salida por stdout en el formato pedido | {{num:entrada}} | {{page:entrada}} |
+| Versión secuencial primero, luego paralela en memoria compartida | {{num:d1}}, {{num:d2}}, {{num:d3}} | {{page:d1}} |
+| Trabajadores con porción fija y sincronización con vecinos | {{num:d2}} | {{page:d2}} |
+| Solución adaptativa que balancea la carga | {{num:d3}} | {{page:d3}} |
+| Grilla, estadísticas, parámetros y controles de tiempo | {{num:interfaz}} | {{page:interfaz}} |
+| Patrones cíclicos y efecto de los parámetros en la estabilidad | {{num:eco}} | {{page:eco}} |
+| Tiempo de CPU y tiempo total | {{num:rendimiento}}, {{num:tablas}} | {{page:rendimiento}} |
+| Reflexión: más hilos no siempre es más rápido | {{num:conclusion}} | {{page:conclusion}} |
+| Cada diseño en una rama, repositorio público y enlaces | Portada y {{num:ramas}} | {{page:ramas}} |
+| Código modular, orientado a objetos, con arreglos y `char*` | {{num:comun}} | {{page:comun}} |
+| Cómo ejecutar el programa | {{num:ejecutar}} | {{page:ejecutar}} |
 
 ## Código y ramas {#ramas}
 
-Cada diseño tiene su rama en el [repositorio](https://github.com/EstebanBautista/MP3): [diseno-1-secuencial](https://github.com/EstebanBautista/MP3/tree/diseno-1-secuencial), [diseno-2-estatico](https://github.com/EstebanBautista/MP3/tree/diseno-2-estatico) y [diseno-3-adaptativo](https://github.com/EstebanBautista/MP3/tree/diseno-3-adaptativo). Cada una conserva el código tal como quedó al terminar ese diseño. Después, las partes comunes se reorganizaron: por ejemplo, las pasadas por banda salieron de `engine/sim_pth.cpp` a `engine/bands.hpp` cuando apareció el diseño 3.
+Cada diseño tiene su rama en el [repositorio](https://github.com/EstebanBautista/MP3): [diseno-1-secuencial](https://github.com/EstebanBautista/MP3/tree/diseno-1-secuencial), [diseno-2-estatico](https://github.com/EstebanBautista/MP3/tree/diseno-2-estatico) y [diseno-3-adaptativo](https://github.com/EstebanBautista/MP3/tree/diseno-3-adaptativo). Cada una conserva el código tal como quedó al terminar ese diseño, y ese código es anterior a la versión final. Después, las partes comunes se reorganizaron: por ejemplo, las pasadas por banda salieron de `engine/sim_pth.cpp` a `engine/bands.hpp` cuando apareció el diseño 3.
 
-La rama `main` reúne los tres diseños, la interfaz, los experimentos y este informe. Lo que describe este documento, y lo que se midió, es esa versión final del motor. Entre la rama del diseño 3 y esa versión, el motor solo cambió en comentarios y en la validación de la opción `--stats-file`.
+La rama `main` reúne los tres diseños, la interfaz, los experimentos y este informe. **Los nombres de funciones y los números de líneas de este informe se refieren a `main`.** En las ramas 1 y 2 pueden no coincidir: `carryRabbitSubphase()` no existe en `diseno-1-secuencial`, y `engine/sim_pth.cpp` tiene {{branchloc:diseno-2-estatico:engine/sim_pth.cpp}} líneas en `diseno-2-estatico`, frente a las {{loc:engine/sim_pth.cpp}} de `main`. Lo que se midió es también la versión final del motor. Entre la rama del diseño 3 y esa versión, el motor solo cambió en comentarios y en la validación de la opción `--stats-file`.
 
 # Descripción del problema {#problema}
 
@@ -74,7 +73,7 @@ El enunciado deja algunos puntos abiertos. Para cerrarlos se usaron los archivos
 {{table:rules}}
 
 - **Conflicto entre conejos, decidido por los datos.** Se compara la edad después del reinicio por procreación, de modo que un conejo que acaba de procrear llega con edad 0 y pierde. Comparar antes del reinicio falla en `allgen20x20` y `allgen100x100`. Los dos órdenes discrepan en {{dec:rabbit_20x20:disagreements}} de {{dec:rabbit_20x20:conflicts}} conflictos de conejos en 20x20, y en {{dec:rabbit_100x100:disagreements}} de {{dec:rabbit_100x100:conflicts}} en 100x100.
-- **Conflicto entre zorros, decisión de diseño.** Ni el enunciado ni los 7 casos deciden este punto. En ningún conflicto de zorros de los 7 casos cambia el ganador según se compare antes o después del reinicio (en 200x200 hay {{dec:fox_200x200:conflicts}} conflictos y {{dec:fox_200x200:disagreements}} discrepancias). Se usó la misma regla que en los conejos, por coherencia. Un caso no incluido en los ejemplos podría distinguir las dos opciones, y cambiarla es una línea de código.
+- **Conflicto entre zorros, decisión de diseño.** Ni el enunciado ni los 7 casos deciden este punto. En ningún conflicto de zorros de los 7 casos cambia el ganador según se compare antes o después del reinicio (en 200x200 hay {{dec:fox_200x200:conflicts}} conflictos y {{dec:fox_200x200:disagreements}} discrepancias). Se usó la misma regla que en los conejos, por coherencia. Un caso no incluido en los ejemplos podría distinguir las dos opciones, y el cambio sería pequeño, pero no inmediato: `updateProcreation()` reinicia la edad antes de la entrega y `mergeFox()` solo recibe una `Cell`, así que habría que llevar la edad anterior hasta la entrega.
 - **Hambre antes o después de comer: no cambia el resultado.** Los zorros que llegan a una misma celda vieron esa misma celda, así que o comieron todos o no comió ninguno. Si comieron todos, los que empatan en edad quedan idénticos. Si ninguno comió, sumar 1 a cada uno conserva el orden.
 - **Las edades no tienen tope.** Un animal encerrado sigue envejeciendo por encima de `GEN_PROC`. Lo muestran los archivos: poner un tope falla en `allgen20x20` y `allgen100x100`, aunque no cambia las salidas finales, porque el animal se reinicia al moverse y nunca llega a un conflicto con esa edad.
 - **Un animal por encima del límite procrea en su primer movimiento,** porque la condición es edad >= `GEN_PROC`. Una cría tiene ambas edades en 0, también si su padre no comió.
@@ -161,7 +160,7 @@ Sin observador activo hay entonces 4 barreras por generación. Como hacer un int
 
 **Funciones principales.** `PthSimulator::run()` reserva, crea y une los hilos. `workerMain()` es el bucle de cada hilo. `BandSink` decide entre aplicar y guardar en buzón, con `pushMove()`. `maxOverMean()` calcula el desequilibrio, como el mayor tiempo ocupado dividido por la media; las esperas en barrera no cuentan como tiempo ocupado.
 
-**Sincronización.** Solo `pthread_barrier_wait`. No hay ningún mutex, porque cada escritura tiene un único dueño: ninguna celda la escriben dos hilos, y ningún buzón lo usan dos hilos a la vez. {{ref:p_carreras}} detalla cada caso.
+**Sincronización.** Solo `pthread_barrier_wait`. No hay ningún mutex, porque cada escritura tiene un único dueño: ninguna celda la escriben dos hilos, y ningún buzón lo usan dos hilos a la vez. La {{ref:p_carreras}} detalla cada caso.
 
 **Justificación.**
 
@@ -180,9 +179,9 @@ Lo nuevo es `rebalance()`. Cada `REBALANCE_EVERY` generaciones, empezando por la
 2. Barrera. Después, el hilo 0 calcula los cortes con `adaptiveBands()` y los dueños con `fillRowOwners()`.
 3. Barrera. Todos ven las bandas nuevas.
 
-`adaptiveBands()` recorre las filas una vez: cada banda toma filas mientras eso la acerque a una parte igual de lo que queda. Así, las bandas posteriores a una fila muy cara reparten el resto sin pagar por ella. En {{fig:fig_cortes}} se ve el efecto sobre un mundo real.
+`adaptiveBands()` recorre las filas una vez: cada banda toma filas mientras eso la acerque a una parte igual de lo que queda. Así, las bandas posteriores a una fila muy cara reparten el resto sin pagar por ella. En la {{fig:fig_cortes}} se ve el efecto sobre un mundo real.
 
-![fig_cortes|1.0|Cortes para 8 hilos en el mundo inicial de `input100x100_unbal01`, con la fórmula de coste del motor. Solo muestra la generación 0; en la corrida completa el desequilibrio medido con reparto estático es mucho menor que este (ver {{ref:adaptativo}}).](figuras/diag_cortes.png)
+![fig_cortes|1.0|Cortes para 8 hilos en el mundo inicial de `input100x100_unbal01`, con la fórmula de coste del motor. Solo muestra la generación 0; en la corrida completa el desequilibrio medido con reparto estático es mucho menor que este (ver la {{ref:adaptativo}}).](figuras/diag_cortes.png)
 
 **Estructuras de datos.** Las mismas del diseño 2, más `rowCost`, un arreglo con el coste de cada fila. `Team` agrupa el contexto, y permite al hilo 0 cambiar `bands` y `rowOwner`, que las pasadas solo leen.
 
@@ -197,12 +196,12 @@ Lo nuevo es `rebalance()`. Cada `REBALANCE_EVERY` generaciones, empezando por la
 - **OpenMP.** Una misma estructura se escribe con menos código de gestión de hilos, y usar los dos modelos permite comparar su coste de desarrollo y de ejecución.
 - **Control estático.** Con `--schedule static` el diseño 3 usa `staticBands` y nunca rebalancea. No es un `schedule(static)` literal: como no hay `omp for`, esa cláusula no tendría dónde aplicarse, y reescribir el motor alrededor de un `omp for` cambiaría también la sincronización. Con este control, misma biblioteca, mismos buzones y mismas barreras, lo único que cambia es el reparto. Esto separa el efecto del reparto del efecto del modelo de hilos.
 
-**Elección de las constantes.** `ANIMAL_WEIGHT` = 8 y `REBALANCE_EVERY` = 50 se eligieron midiendo los dos casos "unbal" con 8 hilos y 5 repeticiones ({{tab:constantes}}). Para el peso, el desequilibrio mejora de 4 a 16 y empeora en 1 y 64, sin un óptimo marcado. Para el periodo, el tiempo cae rápido al rebalancear menos (cada rebalanceo añade dos barreras y un recorrido de la grilla), y 50 está entre los de menor desequilibrio. El barrido varía un parámetro cada vez: no es una búsqueda completa. Se hizo antes de congelar el motor y es independiente de las mediciones de {{ref:rendimiento}}.
+**Elección de las constantes.** `ANIMAL_WEIGHT` = 8 y `REBALANCE_EVERY` = 50 se eligieron midiendo los dos casos "unbal" con 8 hilos y 5 repeticiones ({{tab:constantes}}). Para el peso, el desequilibrio mejora de 4 a 16 y empeora en 1 y 64, sin un óptimo marcado. Para el periodo, el tiempo cae rápido al rebalancear menos (cada rebalanceo añade dos barreras y un recorrido de la grilla), y 50 está entre los de menor desequilibrio. El barrido varía un parámetro cada vez: no es una búsqueda completa. Se hizo antes de congelar el motor y es independiente de las mediciones de la {{ref:rendimiento}}.
 
 :::table constantes|4,4,4|Barrido de las constantes del diseño 3 (`experiments/results/constants_sweep.csv`): mediana de 5 corridas con 8 hilos. El periodo está en generaciones.
 {{table:constants}}
 
-Incluso con los valores elegidos, el tiempo en estos dos casos no mejora frente al reparto estático. Se discute en {{ref:adaptativo}}.
+Incluso con los valores elegidos, el tiempo en estos dos casos no mejora frente al reparto estático. Se discute en la {{ref:adaptativo}}.
 
 # Ventajas y desventajas de cada diseño {#ventajas}
 
@@ -219,15 +218,15 @@ Incluso con los valores elegidos, el tiempo en estos dos casos no mejora frente 
 |---|---|
 | Fue el más rápido en Windows en casi todos los casos: en 200x200, {{perf:win:200x200:pth:8:wall}} s frente a {{perf:win:200x200:omp_a:8:wall}} s de OpenMP con 8 hilos. | Exige gestionar a mano los hilos, la barrera y la memoria: {{loc:engine/sim_pth.cpp}} líneas, más las {{loc:engine/bands.hpp}} compartidas de `engine/bands.hpp`. |
 | Sincronización explícita y fácil de seguir: 4 barreras por generación, sin candados. | Reparto fijo: si la carga se concentra en unas filas, no se adapta. En estos casos la pérdida medida es pequeña (desequilibrio de {{perf:win:100x100_unbal01:pth:8:imb}} en `unbal01` con 8 hilos). |
-| Evidencia directa de carreras con ThreadSanitizer en su compilador: {{tsan:pth:total}} avisos. | En mundos pequeños la barrera pesa más que el trabajo: en 20x20 con 16 hilos tarda {{perf:win:20x20:pth:16:wall}} s, frente a {{perf:win:20x20:seq:1:wall}} s del secuencial. |
-| Pocas dependencias: solo una biblioteca POSIX de hilos. | En el contenedor Linux fue el peor en 200x200: {{perf:linux:200x200:pth:16:wall}} s con 16 hilos. |
+| Con ThreadSanitizer y gcc {{env:linux:compiler}} no se observaron carreras en las corridas indicadas ({{tsan:pth:total}} avisos). | En mundos pequeños es más lento que el secuencial, algo coherente con el coste de las barreras, aunque no demostrado: en 20x20 con 16 hilos tarda {{perf:win:20x20:pth:16:wall}} s, frente a {{perf:win:20x20:seq:1:wall}} s del secuencial. |
+| Pocas dependencias: solo una biblioteca POSIX de hilos. | En 200x200 fue el peor en el contenedor Linux: {{perf:linux:200x200:pth:16:wall}} s con 16 hilos. |
 
 :::table vd3|5,5|Diseño 3: adaptativo con OpenMP.
 | Ventajas | Desventajas |
 |---|---|
-| Se adapta a la carga: en 1000x1000 con 8 hilos, baja el desequilibrio de {{perf:win:large1000x1000:omp_s:8:imb}} a {{perf:win:large1000x1000:omp_a:8:imb}}. | Esa mejora no se traduce en una ganancia clara de tiempo, y en los casos "unbal" es algo más lento que el control estático. |
+| Se adapta a la carga: por ejemplo, en 1000x1000 con 8 hilos baja el desequilibrio de {{perf:win:large1000x1000:omp_s:8:imb}} a {{perf:win:large1000x1000:omp_a:8:imb}}. | Esa mejora no se traduce en una ganancia clara de tiempo, y en los casos "unbal" es algo más lento que el control estático. |
 | Gestión de hilos más breve: el compilador crea el equipo, y el código de hilos es solo una región paralela y sus barreras. | Es el más complejo por lógica: añade costes, cortes, dueños cambiantes y dos barreras más cada 50 generaciones. |
-| Fue el mejor en el contenedor Linux: ×{{perf:linux:200x200:omp_a:16:speedup}} en 200x200 con 16 hilos, aunque con mucha variación. | En Windows es el más lento con barreras: en 100x100 con 16 hilos, {{perf:win:100x100:omp_a:16:wall}} s frente a {{perf:win:100x100:pth:16:wall}} s de Pthreads. |
+| Fue el mejor en 200x200 en el contenedor Linux: ×{{perf:linux:200x200:omp_a:16:speedup}} con 16 hilos, aunque con mucha variación. | En Windows es el más lento con barreras: en 100x100 con 16 hilos, {{perf:win:100x100:omp_a:16:wall}} s frente a {{perf:win:100x100:pth:16:wall}} s de Pthreads. |
 | Comparte las pasadas con el diseño 2, y un mismo binario hace de control con `--schedule static`. | Comprobar carreras es más difícil: la biblioteca de gcc no está instrumentada, y hace falta otra cadena de herramientas ({{ref:tsan}}). |
 
 # Preguntas por diseño {#preguntas}
@@ -236,15 +235,15 @@ Incluso con los valores elegidos, el tiempo en estos dos casos no mejora frente 
 
 **Diseño 1.** No. Todo el trabajo lo hace un hilo, y el tiempo de CPU es prácticamente igual al tiempo total. En 1000x1000 son {{perf:win:large1000x1000:seq:1:cpu}} s de CPU y {{perf:win:large1000x1000:seq:1:wall}} s de reloj.
 
-**Diseño 2.** Sí, porque cada hilo calcula su banda de forma independiente y solo se coordina en las barreras. Pero aprovecharlos depende de que cada generación tenga trabajo suficiente frente al coste de las barreras. En 1000x1000 con 8 hilos acelera ×{{perf:win:large1000x1000:pth:8:speedup}}, con eficiencia {{perf:win:large1000x1000:pth:8:eff}}. En 100x100 el máximo es ×{{perf:win:100x100:pth:4:speedup}} con 4 hilos, y con 16 hilos cae a ×{{perf:win:100x100:pth:16:speedup}}. Pasar de 8 a 16 hilos en este equipo significa usar núcleos lógicos (SMT), no físicos, y en 1000x1000 casi no mejora: {{perf:win:large1000x1000:pth:8:wall}} s a {{perf:win:large1000x1000:pth:16:wall}} s.
+**Diseño 2.** Sí, porque cada hilo calcula su banda de forma independiente y solo se coordina en las barreras. Los datos son coherentes con que aprovecharlos dependa del trabajo de cada generación frente al coste de las barreras, aunque no se demostró. En 1000x1000 con 8 hilos acelera ×{{perf:win:large1000x1000:pth:8:speedup}}, con eficiencia {{perf:win:large1000x1000:pth:8:eff}}. En 100x100 el máximo es ×{{perf:win:100x100:pth:4:speedup}} con 4 hilos, y con 16 hilos cae a ×{{perf:win:100x100:pth:16:speedup}}. Pasar de 8 a 16 hilos en este equipo significa usar núcleos lógicos (SMT), no físicos, y en 1000x1000 casi no mejora: {{perf:win:large1000x1000:pth:8:wall}} s a {{perf:win:large1000x1000:pth:16:wall}} s.
 
-**Diseño 3.** Sí, por la misma razón, y en 1000x1000 alcanza una aceleración parecida (×{{perf:win:large1000x1000:omp_a:8:speedup}} con 8 hilos). En Windows, sin embargo, no llega a superar al secuencial en los mundos de 100x100: su máximo es ×{{perf:win:100x100:omp_s:4:speedup}} con el control estático. En el contenedor Linux la situación cambia, como se ve en {{ref:linux}}.
+**Diseño 3.** Sí, por la misma razón, y en 1000x1000 alcanza una aceleración parecida (×{{perf:win:large1000x1000:omp_a:8:speedup}} con 8 hilos). En Windows, sin embargo, no llega a superar al secuencial en los mundos de 100x100: su máximo es ×{{perf:win:100x100:omp_s:4:speedup}} con el control estático. En el contenedor Linux la situación cambia, como se ve en la {{ref:linux}}.
 
 ## ¿Qué variables se comparten, y dónde podría haber una carrera? {#p_carreras}
 
 **Diseño 1.** Ninguna, porque hay un solo hilo.
 
-**Diseños 2 y 3.** Están en {{tab:compartidas}}, con el punto donde podría ocurrir una carrera y lo que la impide. {{ref:tsan}} indica cómo se comprobó.
+**Diseños 2 y 3.** Están en la {{tab:compartidas}}, con el punto donde podría ocurrir una carrera y lo que la impide. La {{ref:tsan}} indica cómo se comprobó.
 
 :::table compartidas|2.2,4,4|Variables compartidas, posibles carreras y lo que las evita en los diseños 2 y 3.
 | Variable | Dónde podría ocurrir la carrera | Qué lo evita |
@@ -267,7 +266,7 @@ El error más sutil posible es un `rowOwner` desactualizado tras un rebalanceo: 
 
 **Diseño 2.** Además, `Band`, `rowOwner` y una matriz de `MoveBox`. *Mejoras posibles, no probadas:* como con bandas fijas un movimiento solo llega a una banda vecina, bastarían dos buzones por hilo y no hilos al cuadrado; se conservó la matriz para compartir el código con el diseño 3. Una división en dos dimensiones reduciría las fronteras en mundos muy grandes, pero añadiría vecinos y código.
 
-**Diseño 3.** Además, `rowCost`. *Mejoras posibles, no probadas:* el coste es una estimación con un peso fijo, y se podría usar el tiempo real de cada banda. Rebalancear solo cuando el desequilibrio supere un umbral evitaría barreras inútiles. Dado que el desequilibrio medido ya es pequeño ({{ref:adaptativo}}), estas mejoras tienen poco margen, y el mayor coste observado está en otra parte, las barreras.
+**Diseño 3.** Además, `rowCost`. *Mejoras posibles, no probadas:* el coste es una estimación con un peso fijo, y se podría usar el tiempo real de cada banda. Rebalancear solo cuando el desequilibrio supere un umbral evitaría barreras inútiles. Dado que el desequilibrio medido ya es pequeño ({{ref:adaptativo}}), estas mejoras parecen tener poco margen. No se midió un desglose del coste por partes.
 
 ## ¿Qué tan fácil es extender el programa, y qué tan independientes son las entidades? {#p_extension}
 
@@ -287,7 +286,7 @@ En ningún diseño aumenta el número de hilos al aumentar las entidades, a dife
 
 **Diseño 1.** El tiempo por generación crece con el tamaño: {{perf:win:100x100:seq:1:pergen}} µs en 100x100, {{perf:win:200x200:seq:1:pergen}} µs en 200x200 y {{perf:win:large1000x1000:seq:1:pergen}} µs en 1000x1000. No hay forma de compensarlo.
 
-**Diseño 2.** Más entidades favorecen al paralelismo, porque aumentan el trabajo entre barreras. La mejor aceleración sube con el tamaño: ×{{perf:win:100x100:pth:4:speedup}} en 100x100, ×{{perf:win:200x200:pth:8:speedup}} en 200x200 y ×{{perf:win:large1000x1000:pth:16:speedup}} en 1000x1000, y también sube el número de hilos que conviene usar. Con más movimientos que cruzan bandas, los buzones crecen, y se amplían duplicando su capacidad.
+**Diseño 2.** La mejor aceleración sube con el tamaño, lo que es coherente con que haya más trabajo entre barreras, aunque no se demostró: ×{{perf:win:100x100:pth:4:speedup}} en 100x100, ×{{perf:win:200x200:pth:8:speedup}} en 200x200 y ×{{perf:win:large1000x1000:pth:16:speedup}} en 1000x1000, y también sube el número de hilos que conviene usar. Con más movimientos que cruzan bandas, los buzones crecen, y se amplían duplicando su capacidad.
 
 **Diseño 3.** Sigue la misma tendencia: ×{{perf:win:100x100:omp_a:4:speedup}} en 100x100, ×{{perf:win:200x200:omp_a:4:speedup}} en 200x200 y ×{{perf:win:large1000x1000:omp_a:16:speedup}} en 1000x1000. Cada rebalanceo recorre la grilla, de modo que su coste también crece con el mundo. Con pocas filas por hilo pueden quedar bandas vacías; las pruebas cubren esos mundos delgados.
 
@@ -309,25 +308,27 @@ La suite tiene {{tests:}} pruebas (`python -m unittest discover -s tests -t .`),
 
 ThreadSanitizer (TSan) no está disponible con MinGW, así que se usó en Linux, dentro de un contenedor Docker sobre WSL2. Los archivos con la evidencia están en `experiments/results`, y `scripts/tsan.sh` la reproduce.
 
-:::table tsan_tabla|3.3,4,1.5,2.5|Corridas con ThreadSanitizer. Cada fila son {{tsan:pth:runs}} corridas: 20x20 ({{ngen:20x20}} generaciones) y `unbal01` (acortado a {{tsan:pth:gens}} generaciones), con 4 y 8 hilos.
+:::table tsan_tabla|3.3,4,1.5,2.5|Corridas con ThreadSanitizer. Cada fila son {{tsan:pth:runs}} corridas: 20x20 ({{ngen:20x20}} generaciones) y `unbal01` (acortado a {{tsan:pth:gens}} generaciones), con 4 y 8 hilos, con `--dump-all` y sin observador.
 | Motor | Compilador y biblioteca | Avisos | Salida igual a la secuencial |
 |---|---|---|---|
 | `eco_pth` | gcc {{env:linux:compiler}}, TSan | {{tsan:pth:total}} | {{tsan:pth:identical}} |
 | `eco_omp` con Archer | {{tsan:archer:compiler}}, libomp y Archer | {{tsan:archer:total}} | {{tsan:archer:identical}} |
-| `eco_omp` sin Archer | gcc {{env:linux:compiler}}, libgomp sin instrumentar | {{tsan:omp:total}} (falsos positivos, ver abajo) | {{tsan:omp:identical}} |
+| `eco_omp` sin Archer | gcc {{env:linux:compiler}}, libgomp sin instrumentar | {{tsan:omp:total}} (se consideran falsos positivos, ver abajo) | {{tsan:omp:identical}} |
 
 **Pthreads.** En estas corridas no se observaron carreras. Se usó gcc {{env:linux:compiler}}, el compilador del contenedor de medición, no el g++ {{env:win:compiler}} de Windows.
 
-**OpenMP: la evidencia se apoya en Archer, no en la compilación con gcc.** Con gcc, TSan da {{tsan:omp:total}} avisos ({{tsan:omp:warnlist}} por corrida, en {{tsan:omp:distinct}} ubicaciones distintas). libgomp, la biblioteca de OpenMP de gcc, no está instrumentada, de modo que TSan no ve el orden que imponen sus barreras. Se examinaron así:
+**OpenMP: la evidencia se apoya en Archer, no en la compilación con gcc.** Con gcc, TSan da {{tsan:omp:total}} avisos ({{tsan:omp:warnlist}} por corrida, en {{tsan:omp:distinct}} ubicaciones distintas y {{tsan:omp:pairs}} pares de ubicaciones). libgomp, la biblioteca de OpenMP de gcc, no está instrumentada, de modo que TSan no ve el orden que imponen sus barreras. Se examinaron así:
 
-1. Se agruparon los avisos por pares de accesos, y en cada par se comprobó que el código los separa con una `#pragma omp barrier`, con la barrera implícita de `omp single` o con el final de la región paralela. No apareció ningún par sin esa separación.
+1. Se agruparon los avisos por pares de ubicaciones (la lista completa está en `experiments/results/tsan_omp.txt`) y se revisaron en el código: corresponden a pasadas o fases que separa una `#pragma omp barrier`, la barrera implícita de `omp single` o el final de la región paralela. Los pares de una misma línea, como dos entregas en la misma celda, son compatibles con hilos que escriben en generaciones distintas tras un rebalanceo. Esta revisión es por ubicación, no por instancia, y por eso no basta sola.
 2. Se repitieron las corridas con Archer, la herramienta de LLVM que informa a TSan de las barreras de OpenMP, compilando con clang y libomp. Dieron {{tsan:archer:total}} avisos.
 3. Como control negativo, un programa pequeño en el mismo entorno da {{tsan:archer:control:with_barrier}} avisos con barrera y {{tsan:archer:control:no_barrier}} sin ella, así que Archer sí detecta una barrera ausente.
 4. La cobertura de código confirma que esas corridas ejecutaron el rebalanceo: `adaptiveBands()` se llamó {{tsan:archer:fnda:adaptiveBands}} veces, las esperadas.
 
 Por eso se consideran falsos positivos, sin suprimir ninguno y sin cambiar el motor por ellos. Para OpenMP, por tanto, lo que se afirma es que en estas corridas con Archer no se observaron carreras. Clang y libomp no son la compilación con gcc y libgomp que se midió.
 
-**Lo que no se afirma ni se probó.** TSan solo ve las carreras de las ejecuciones que observa, de modo que esto no demuestra que no existan. No se ejecutó con 16 hilos, con el control `--schedule static`, con los mundos 100x100 completos, 200x200 o 1000x1000, ni con `-O3` (se compiló con `-O1`). Tampoco se ejecutó en Windows. El argumento de fondo es el de {{tab:compartidas}}: cada escritura tiene un único dueño en cada fase.
+**Con observador y sin él.** La mitad de las corridas usa `--dump-all`, con el observador y su barrera adicional, y compara todas las generaciones con el secuencial. La otra mitad corre sin opciones, y compara la salida final: es el camino que se midió, con 4 barreras por generación más las del rebalanceo.
+
+**Lo que no se afirma ni se probó.** TSan solo ve las carreras de las ejecuciones que observa, de modo que esto no demuestra que no existan. No se ejecutó con 2 o 16 hilos, con el control `--schedule static`, con `unbal01` completo, con los mundos 100x100, `unbal02`, 200x200 o 1000x1000, ni con `-O3` (se compiló con `-O1`). Tampoco se ejecutó en Windows. El argumento de fondo es el de la {{tab:compartidas}}: cada escritura tiene un único dueño en cada fase.
 
 # Resultados de rendimiento {#rendimiento}
 
@@ -339,7 +340,7 @@ Por eso se consideran falsos positivos, sin suprimir ninguno y sin cambiar el mo
 - **Métricas:** tiempo total (reloj monótono), tiempo de CPU de todo el proceso, aceleración (`T_seq / T`, siempre respecto a `eco_seq`), eficiencia (aceleración / hilos) y desequilibrio (mayor tiempo ocupado / media). Sin interfaz y sin escritura de cuadros; la lectura y la escritura de archivos quedan fuera. En Windows, el tiempo de CPU tiene una resolución de unos 15,6 ms, de modo que en 20x20 no es fiable.
 - **Mundo grande:** generado con semilla {{env:win:seed}}: 1000x1000, con las densidades de `input200x200`, {{env:win:ngen}} generaciones.
 
-Las tablas completas están en {{ref:tablas}}, y los datos crudos en `experiments/results`.
+Las tablas completas están en la {{ref:tablas}}, y los datos crudos en `experiments/results`.
 
 ## Resultados principales {#principales}
 
@@ -350,7 +351,7 @@ Las tablas completas están en {{ref:tablas}}, y los datos crudos en `experiment
 
 **El tamaño del mundo decide.** En 20x20, todos los diseños con 2 o más hilos son más lentos que el secuencial: {{perf:win:20x20:pth:16:wall}} s con Pthreads y {{perf:win:20x20:omp_a:16:wall}} s con OpenMP a 16 hilos, frente a {{perf:win:20x20:seq:1:wall}} s. En 100x100 solo Pthreads gana, con un máximo de ×{{perf:win:100x100:pth:4:speedup}}. En 200x200, Pthreads llega a ×{{perf:win:200x200:pth:8:speedup}} con 8 hilos. El único caso con aceleración clara en todos los diseños es 1000x1000.
 
-**Con 16 hilos no se gana casi nunca.** En Windows, 16 hilos son más lentos que 8 en todos los mundos, salvo en 1000x1000, donde hay un empate dentro del IQR. El equipo tiene 8 núcleos físicos, y del hilo 9 al 16 son núcleos lógicos.
+**Con 16 hilos no se gana casi nunca.** En Windows, 16 hilos son más lentos que 8 en todos los mundos, salvo en 1000x1000. Allí, Pthreads y OpenMP adaptativo empatan dentro del IQR, y el control estático mejora de {{perf:win:large1000x1000:omp_s:8:wall}} s [{{perf:win:large1000x1000:omp_s:8:iqr}}] a {{perf:win:large1000x1000:omp_s:16:wall}} s [{{perf:win:large1000x1000:omp_s:16:iqr}}]. El equipo tiene 8 núcleos físicos, y del hilo 9 al 16 son núcleos lógicos.
 
 ![fig_efic|0.8|Eficiencia en Windows.](figuras/perf_eficiencia.png)
 
@@ -367,7 +368,7 @@ Las tablas completas están en {{ref:tablas}}, y los datos crudos en `experiment
 
 ![fig_barreras|0.62|Coste de una barrera vacía según el número de hilos.](figuras/perf_barreras.png)
 
-En Windows, una barrera de OpenMP cuesta más que una de Pthreads con cualquier número de hilos. Por el código, cada generación tiene 4 barreras (más 2 cada 50 generaciones en el modo adaptativo). A 16 hilos, 4 barreras vacías costarían unos {{bar4:win:pth:16}} µs en Pthreads y {{bar4:win:omp:16}} µs en OpenMP. {{tab:grano}} las compara con el tiempo medido por generación.
+En Windows, una barrera de OpenMP cuesta más que una de Pthreads con cualquier número de hilos. Por el código, cada generación tiene 4 barreras (más 2 cada 50 generaciones en el modo adaptativo). A 16 hilos, 4 barreras vacías costarían unos {{bar4:win:pth:16}} µs en Pthreads y {{bar4:win:omp:16}} µs en OpenMP. La {{tab:grano}} las compara con el tiempo medido por generación.
 
 :::table grano|2,2.5,3,1.5|Tiempo por generación en Windows, comparable con el coste de 4 barreras vacías a 16 hilos.
 {{table:grain}}
@@ -378,12 +379,12 @@ En 20x20, 100x100 y 200x200, el tiempo por generación a 16 hilos es del mismo o
 
 El diseño 3 se comparó con su control estático, de modo que el modelo de hilos sea el mismo. El resultado va en contra de lo esperado:
 
-:::table adaptativo_tabla|2.5,0.9,1.6,1.8,2.5,2.5|Desequilibrio (mayor tiempo ocupado / media) y tiempo en OpenMP, Windows. Entre corchetes, el IQR.
+:::table adaptativo_tabla|2.5,0.9,1.6,1.8,2.5,2.5|Desequilibrio (mayor tiempo ocupado / media) y tiempo en OpenMP, Windows. Entre corchetes, el IQR. Se muestran 8 y 16 hilos en los casos "unbal" y en 1000x1000, 8 hilos en 200x200, y las dos configuraciones de Windows donde el adaptativo no reduce el desequilibrio.
 {{table:adaptive}}
 
 ![fig_deseq|0.8|Desequilibrio medido en Windows.](figuras/perf_desequilibrio.png)
 
-- **El adaptativo reduce el desequilibrio.** Lo hace en todos los casos de la tabla, de modo que el mecanismo funciona.
+- **El adaptativo reduce el desequilibrio en casi todas las configuraciones.** Lo hace en 22 de las 24 de Windows con 2 o más hilos. Las excepciones son 20x20 con 2 y 4 hilos ({{perf:win:20x20:omp_a:2:imb}} frente a {{perf:win:20x20:omp_s:2:imb}}, y {{perf:win:20x20:omp_a:4:imb}} frente a {{perf:win:20x20:omp_s:4:imb}}). En el contenedor, de 8 configuraciones, la excepción es 1000x1000 con 4 hilos ({{perf:linux:large1000x1000:omp_a:4:imb}} frente a {{perf:linux:large1000x1000:omp_s:4:imb}}).
 - **Pero no da una ganancia clara de tiempo.** En 1000x1000 con 8 hilos, {{perf:win:large1000x1000:omp_a:8:wall}} s frente a {{perf:win:large1000x1000:omp_s:8:wall}} s, una diferencia del orden del IQR. En los dos casos "unbal" es ligeramente más lento.
 - **Los casos "unbal" no están muy desequilibrados en la corrida completa.** Con reparto estático su desequilibrio es de {{perf:win:100x100_unbal01:omp_s:8:imb}} y {{perf:win:100x100_unbal02:omp_s:8:imb}} a 8 hilos, de modo que hay poco que recuperar, aunque en el mundo inicial la carga sea muy desigual ({{fig:fig_cortes}}). No se midió cómo evoluciona la carga durante la corrida, y por qué se iguala queda sin probar.
 
@@ -413,16 +414,16 @@ También se midió en un contenedor `gcc:14` (GCC {{env:linux:compiler}}) sobre 
 | **Complejidad: sincronización** | Ninguna | {{count:engine/sim_pth.cpp:pthread_barrier_wait}} llamadas a barrera en el código; 4 por generación | {{count:engine/sim_omp.cpp:#pragma omp barrier}} directivas de barrera en el código; 4 por generación, más 2 cada 50 |
 | **Complejidad: gestión de hilos** | Ninguna | Manual: crear, unir, inicializar la barrera y reservar la memoria | La hace OpenMP: una región paralela, pero debe tratar un equipo menor que el pedido |
 | **Complejidad: razonar la corrección** | Directa | Dueños fijos: basta revisar las fases | Dueños que cambian: hay que razonar además el punto de rebalanceo |
-| **Complejidad: verificar carreras** | No aplica | TSan con gcc da {{tsan:pth:total}} avisos | Requiere Archer con clang: gcc da {{tsan:omp:total}} falsos positivos |
+| **Complejidad: verificar carreras** | No aplica | TSan con gcc da {{tsan:pth:total}} avisos | Requiere Archer con clang: gcc da {{tsan:omp:total}} avisos, que se consideran falsos positivos |
 | **Mantenimiento: cambiar una regla** | Un archivo: `engine/rules.hpp` | El mismo archivo; hay que conservar la entrega conmutativa | Igual que D2 |
 | **Mantenimiento: especie nueva** | Una subfase | Una subfase, con 2 pasadas y 2 barreras más | Igual que D2, y revisar la estimación de coste |
 | **Mantenimiento: riesgos** | Bajo | Errores de sincronización que no siempre cambian la salida | Lo mismo, y además un `rowOwner` desactualizado; la ganancia depende de constantes ajustadas para estos casos |
-| **Mantenimiento: portabilidad del rendimiento** | Tiempos parecidos en las dos plataformas: {{perf:win:200x200:seq:1:wall}} s y {{perf:linux:200x200:seq:1:wall}} s en 200x200 | Peor en el contenedor Linux | Mejor en el contenedor Linux y peor en Windows |
+| **Mantenimiento: portabilidad del rendimiento** | Windows y contenedor: {{perf:win:200x200:seq:1:wall}} s y {{perf:linux:200x200:seq:1:wall}} s en 200x200; {{perf:win:large1000x1000:seq:1:wall}} s y {{perf:linux:large1000x1000:seq:1:wall}} s en 1000x1000 | En 200x200, mucho peor en este contenedor; en 1000x1000, parecido a Windows | En 200x200, mejor en este contenedor; en 1000x1000, algo más lento que en Windows |
 
 :::table lineas|4,3,3|Tamaño de los archivos que distinguen a cada diseño.
 {{table:loc}}
 
-Compartir las reglas y las pasadas fue lo que más redujo el mantenimiento. Sin `engine/bands.hpp`, unas cien líneas se habrían copiado entre los dos diseños paralelos, y sin `engine/rules.hpp`, una corrección de una regla habría que repetirla tres veces.
+Compartir las reglas y las pasadas fue lo que más redujo el mantenimiento. Sin `engine/bands.hpp`, las pasadas se habrían copiado entre los dos diseños paralelos, y sin `engine/rules.hpp`, una corrección de una regla habría que repetirla tres veces.
 
 **Balance.** D2 tiene la mejor relación entre rendimiento y complejidad en estos datos sobre Windows. D3 añade complejidad y no compensa con tiempo, lo cual no invalida a OpenMP, sino al rebalanceo en estos mundos: la comparación con su control estático lo muestra. D1 es el mejor mientras el mundo sea pequeño, y siempre es necesario como referencia.
 
@@ -430,7 +431,7 @@ Compartir las reglas y las pasadas fue lo que más redujo el mantenimiento. Sin 
 
 ## Qué se esperaba y qué se encontró {#eco_resumen}
 
-> **El enunciado espera patrones cíclicos en los que zorros y conejos suben y bajan uno en relación con el otro. Esto es lo que muestran los datos:** las poblaciones sí suben y bajan de forma periódica, pero con el periodo corto de reproducción de cada especie, `GEN_PROC`+1 generaciones, y no con el ciclo lento depredador-presa esperado. Con `GEN_PROC_FOXES`=10 aparece una oscilación lenta débil, con los zorros detrás de los conejos, que no demuestra una interacción depredador-presa. En las 39 corridas de barrido no se vio ningún ciclo lento fuerte, y solo {{sens:0.3}} tienen un periodo lento débil con el umbral usado. Esto vale a la sensibilidad indicada en {{ref:eco_limites}}: no prueba que no exista nada más lento.
+> **El enunciado espera patrones cíclicos en los que zorros y conejos suben y bajan uno en relación con el otro. Esto es lo que muestran los datos:** las poblaciones sí suben y bajan de forma periódica, pero con el periodo corto de reproducción de cada especie, `GEN_PROC`+1 generaciones, y no con el ciclo lento depredador-presa esperado. Con `GEN_PROC_FOXES`=10 aparece una oscilación lenta débil, con los zorros detrás de los conejos, que no demuestra una interacción depredador-presa. En las 39 corridas de barrido no se vio ningún ciclo lento fuerte, y solo {{sens:0.3}} tienen un periodo lento débil con el umbral usado. Esto vale a la sensibilidad indicada en la {{ref:eco_limites}}: no prueba que no exista nada más lento.
 
 Las reglas no se ajustaron para obtener ciclos: están fijadas por las salidas esperadas de la tarea, y la configuración base se eligió antes de los barridos y no se cambió después.
 
@@ -475,9 +476,9 @@ Con umbral 0,3 se detecta en 5 de las 6 corridas. La semilla 3 de 10 000 generac
 
 Estas son **asociaciones; no se probó causalidad**:
 
-- **`GEN_PROC_RABBITS`.** Los zorros bajan de {{ecor:gpr2:fox_mean}} con 2 a {{ecor:gpr5:fox_mean}} con 5. Con 8 se extinguen, en las generaciones {{eco:gpr8:1:extinct_foxes_gen}}, {{eco:gpr8:2:extinct_foxes_gen}} y {{eco:gpr8:3:extinct_foxes_gen}} según la semilla.
+- **`GEN_PROC_RABBITS`.** Los zorros bajan de un rango de {{ecorh:gpr2:fox_mean}} con 2 a {{ecorh:gpr5:fox_mean}} con 5. Con 8 se extinguen, en las generaciones {{eco:gpr8:1:extinct_foxes_gen}}, {{eco:gpr8:2:extinct_foxes_gen}} y {{eco:gpr8:3:extinct_foxes_gen}} según la semilla.
 - **`GEN_PROC_FOXES`.** Con 5 se extinguen los conejos, en las generaciones {{eco:gpf5:1:extinct_rabbits_gen}}, {{eco:gpf5:2:extinct_rabbits_gen}} y {{eco:gpf5:3:extinct_rabbits_gen}}, y sobreviven los zorros. Una prueba aparte, sin conejos, también deja zorros con ese valor ({{fox:5:foxes_gen2999}} en la generación 2999), mientras que con 10 se extinguen en la generación {{fox:10:extinct_foxes_gen}}. La causa no se probó. Con 10 hay más zorros ({{ecor:gpf10:fox_mean}}) y menos conejos ({{ecor:gpf10:rabbit_mean}}).
-- **`GEN_FOOD_FOXES`.** Con 3 los zorros se extinguen en las generaciones {{eco:gff3:1:extinct_foxes_gen}}, {{eco:gff3:2:extinct_foxes_gen}} y {{eco:gff3:3:extinct_foxes_gen}}. Los zorros suben de {{ecor:gff6:fox_mean}} con 6 a {{ecor:gff20:fox_mean}} con 20, y los conejos bajan.
+- **`GEN_FOOD_FOXES`.** Con 3 los zorros se extinguen en las generaciones {{eco:gff3:1:extinct_foxes_gen}}, {{eco:gff3:2:extinct_foxes_gen}} y {{eco:gff3:3:extinct_foxes_gen}}. Los zorros suben de un rango de {{ecorh:gff6:fox_mean}} con 6 a {{ecorh:gff20:fox_mean}} con 20, y los conejos bajan.
 - **Derivas largas.** "Estable" no significa "constante". Por ejemplo, con `GEN_PROC_RABBITS`=5 (semilla 1) los zorros pasan de unos {{ser:gpr5:1:foxes:ma:150}} en la generación 150 a unos {{ser:gpr5:1:foxes:ma:1510}} en la 1510.
 
 ## Efecto de las rocas {#eco_rocas}
@@ -505,7 +506,7 @@ Para saber qué se habría visto, se inyectaron ciclos conocidos en series reale
 
 La interfaz es una página web local en tres columnas: parámetros a la izquierda, grilla al centro con los controles de tiempo debajo, y estadísticas a la derecha. Funciona sin internet, con Python y su biblioteca estándar en el servidor y HTML, CSS y JavaScript sin dependencias externas en el navegador.
 
-El servidor (`web/server.py`) lanza el motor como proceso aparte con `--frames`. Cada cuadro tiene una cabecera de 16 bytes y 1 byte por celda. El motor se bloquea cuando nadie lee, así que una página en pausa no acumula memoria, y una corrida larga no se genera por adelantado. Por omisión usa `eco_seq`. Las mediciones de {{ref:rendimiento}} no pasan por la interfaz.
+El servidor (`web/server.py`) lanza el motor como proceso aparte con `--frames`. Cada cuadro tiene una cabecera de 16 bytes y 1 byte por celda. El motor se bloquea cuando nadie lee, así que una página en pausa no acumula memoria, y una corrida larga no se genera por adelantado. Por omisión usa `eco_seq`. Las mediciones de la {{ref:rendimiento}} no pasan por la interfaz.
 
 :::table visuales|4,8|Los cuatro requisitos visuales del enunciado.
 | Requisito | Cómo se cumple |
@@ -534,7 +535,9 @@ powershell scripts/build.ps1
 # Compilar en Linux
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DECO_STATIC=OFF && cmake --build build
 
-# Ejecutar cada diseño: entrada por stdin, resultado por stdout, tiempos por stderr
+# Ejecutar cada diseño: entrada por stdin, resultado por stdout, tiempos por stderr.
+# Comandos para bash (Git Bash en Windows). En Linux, sin .exe. En PowerShell, "<" no existe:
+#   cmd /c "build\eco_seq.exe < ecosystem_examples\input100x100"
 build/eco_seq.exe < ecosystem_examples/input100x100
 build/eco_pth.exe --threads 8 < ecosystem_examples/input100x100
 build/eco_omp.exe --threads 8 < ecosystem_examples/input100x100
@@ -558,29 +561,29 @@ La línea de tiempos en stderr tiene esta forma: `time wall=... cpu=... threads=
 
 # Conclusión {#conclusion}
 
-La reflexión del curso dice que un diseño paralelo no siempre necesita más hilos para ser más rápido. Estos datos lo confirman de forma concreta. Con los mismos 16 hilos, Pthreads tarda {{perf:win:20x20:pth:16:wall}} s en 20x20, frente a {{perf:win:20x20:seq:1:wall}} s del secuencial, y en 1000x1000 acelera ×{{perf:win:large1000x1000:pth:16:speedup}}. Lo que decide no es el número de hilos, sino cuánto trabajo hay entre dos puntos de sincronización.
+La reflexión del curso dice que un diseño paralelo no siempre necesita más hilos para ser más rápido. Estos datos lo confirman de forma concreta. Con los mismos 16 hilos, Pthreads tarda {{perf:win:20x20:pth:16:wall}} s en 20x20, frente a {{perf:win:20x20:seq:1:wall}} s del secuencial, y en 1000x1000 acelera ×{{perf:win:large1000x1000:pth:16:speedup}}. Esto es coherente con que importe cuánto trabajo hay entre dos puntos de sincronización, aunque no se midió un desglose que lo demuestre ({{ref:barreras}}).
 
 Tres conclusiones van más allá de lo que se esperaba al empezar:
 
-1. **La complejidad no compró tiempo.** El reparto adaptativo funciona como mecanismo, porque baja el desequilibrio, pero en estos casos el desequilibrio no era el problema.
-2. **La plataforma importa tanto como el diseño.** La misma fuente invierte la comparación entre OpenMP y Pthreads al cambiar de entorno, de modo que una elección de modelo basada en una sola plataforma no se puede generalizar.
+1. **La complejidad no compró tiempo.** El reparto adaptativo baja el desequilibrio en casi todas las configuraciones, pero sin una ganancia clara de tiempo. El desequilibrio estático ya era pequeño, y no se aisló la causa.
+2. **La plataforma también importa.** En 200x200, en este contenedor, la misma fuente invierte la comparación entre OpenMP y Pthreads. En 1000x1000 el contenedor se parece a Windows, y OpenMP adaptativo es más lento allí ({{perf:linux:large1000x1000:omp_a:16:wall}} s frente a {{perf:win:large1000x1000:omp_a:16:wall}} s con 16 hilos). Una elección de modelo basada en una sola plataforma y un solo tamaño no se puede generalizar.
 3. **Separar decisión y entrega fue lo más valioso.** Decidir sobre un estado de solo lectura y entregar de forma conmutativa dio el mismo resultado en todos los casos y números de hilos, con una sincronización simple y sin candados.
 
-:::table recomendacion|2.2,3.4,6.4|Recomendación según el tamaño del mundo, con los datos de Windows de {{tab:mejores}}.
+:::table recomendacion|2.2,3.4,6.4|Recomendación según el tamaño del mundo, con los datos de Windows de la {{tab:mejores}}.
 | Mundo | Diseño recomendado | Por qué |
 |---|---|---|
-| Pequeño (hasta unos 20x20) | D1, secuencial | Cualquier diseño paralelo es más lento: {{perf:win:20x20:seq:1:wall}} s frente a {{perf:win:20x20:pth:2:wall}} s con Pthreads y 2 hilos. |
+| Pequeño (20x20; no se midió ningún tamaño entre este y 100x100) | D1, secuencial | Cualquier diseño paralelo es más lento: {{perf:win:20x20:seq:1:wall}} s frente a {{perf:win:20x20:pth:2:wall}} s con Pthreads y 2 hilos. |
 | Mediano (100x100) | D2 con 4 hilos | Único con ganancia: ×{{perf:win:100x100:pth:4:speedup}}. Con 2 a 4 hilos basta, y con 16 es peor que el secuencial. OpenMP no pasa de ×{{perf:win:100x100:omp_s:4:speedup}}. |
 | Mediano-grande (200x200) | D2 con 8 hilos | ×{{perf:win:200x200:pth:8:speedup}}. Con 16 hilos baja a ×{{perf:win:200x200:pth:16:speedup}}. |
 | Grande (1000x1000) | D2 o D3 con 8 hilos | ×{{perf:win:large1000x1000:pth:8:speedup}} y ×{{perf:win:large1000x1000:omp_a:8:speedup}}. Pasar a 16 hilos casi no mejora el tiempo y sube la CPU de {{perf:win:large1000x1000:pth:8:cpu}} s a {{perf:win:large1000x1000:pth:16:cpu}} s. |
 
-Estas recomendaciones valen para este equipo y este sistema. En el contenedor Linux, en 200x200, la recomendación sería OpenMP (×{{perf:linux:200x200:omp_a:8:speedup}} con 8 hilos, frente a ×{{perf:linux:200x200:pth:8:speedup}} de Pthreads). Por eso, antes de elegir, conviene medir en la plataforma final. No se recomienda el rebalanceo por su tiempo: su control estático rinde igual en estos casos, con menos código.
+Estas recomendaciones valen para este equipo y este sistema. En el contenedor Linux, en 200x200, la recomendación sería OpenMP (×{{perf:linux:200x200:omp_a:8:speedup}} con 8 hilos, frente a ×{{perf:linux:200x200:pth:8:speedup}} de Pthreads). Por eso, antes de elegir, conviene medir en la plataforma final. No se recomienda el rebalanceo por su tiempo: su control estático rinde de forma parecida en estos casos, con menos código.
 
 En cuanto al ecosistema, la simulación muestra cómo los parámetros cambian la estabilidad, desde la coexistencia hasta la extinción de una especie, y sus poblaciones oscilan. Pero no muestra, a la sensibilidad indicada, el ciclo lento y fuerte entre depredador y presa que esperaba el enunciado, y este informe lo deja dicho en lugar de forzarlo.
 
 # Apéndice: tablas completas de tiempos {#tablas}
 
-Cada celda tiene la mediana del tiempo total en segundos, el IQR entre corchetes, la aceleración respecto a `eco_seq` (×) y la eficiencia (e). La última columna es el sobrecoste con 1 hilo frente a `eco_seq`. El tiempo de CPU de cada medición está en `experiments/results/performance.csv`, y aparece en {{fig:fig_cpu}}.
+Cada celda tiene la mediana del tiempo total en segundos, el IQR entre corchetes, la aceleración respecto a `eco_seq` (×) y la eficiencia (e). La última columna es el sobrecoste con 1 hilo frente a `eco_seq`. El tiempo de CPU de cada medición está en `experiments/results/performance.csv`, y aparece en la {{fig:fig_cpu}}.
 
 ## Windows 10 nativo
 

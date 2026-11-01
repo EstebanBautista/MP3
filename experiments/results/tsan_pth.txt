@@ -1,5 +1,5 @@
 ThreadSanitizer evidence: pthreads
-date: 2026-10-31T20:39:10Z
+date: 2026-11-01T01:16:33Z
 image: gcc:14
 compiler: g++ (GCC) 14.4.0
 OMP_TOOL_LIBRARIES=
@@ -10,35 +10,65 @@ TSAN_OPTIONS=halt_on_error=0 exitcode=66 second_deadlock_stack=1
 unbal01 generations: 200 (original input has 10000)
 schedule: default (adaptive for OpenMP, REBALANCE_EVERY=50 in engine/simulator.hpp)
 
---- eco_pth --threads 4 < input 20x20
+--- eco_pth --threads 4 --dump-all < input 20x20 (mode: dump)
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
 distinct SUMMARY lines (count of each, complete list):
 first 120 lines of the log:
-time wall=0.272493 cpu=0.460654 threads=4 imbalance=1.162
-time wall=0.272493 cpu=0.460654 threads=4 imbalance=1.162
+time wall=0.285612 cpu=0.462529 threads=4 imbalance=1.051
+time wall=0.285612 cpu=0.462529 threads=4 imbalance=1.051
 
---- eco_pth --threads 8 < input 20x20
+--- eco_pth --threads 8 --dump-all < input 20x20 (mode: dump)
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
 distinct SUMMARY lines (count of each, complete list):
 first 120 lines of the log:
-time wall=0.456096 cpu=0.854070 threads=8 imbalance=1.262
-time wall=0.456096 cpu=0.854070 threads=8 imbalance=1.262
+time wall=0.465449 cpu=0.848981 threads=8 imbalance=1.181
+time wall=0.465449 cpu=0.848981 threads=8 imbalance=1.181
 
---- eco_pth --threads 4 < input unbal01
+--- eco_pth --threads 4 --dump-all < input unbal01 (mode: dump)
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
 distinct SUMMARY lines (count of each, complete list):
 first 120 lines of the log:
-time wall=0.140552 cpu=0.309724 threads=4 imbalance=1.303
-time wall=0.140552 cpu=0.309724 threads=4 imbalance=1.303
+time wall=0.130727 cpu=0.313603 threads=4 imbalance=1.289
+time wall=0.130727 cpu=0.313603 threads=4 imbalance=1.289
 
---- eco_pth --threads 8 < input unbal01
+--- eco_pth --threads 8 --dump-all < input unbal01 (mode: dump)
 exit code: 0; TSan warnings: 0; output identical to sequential: yes
 distinct SUMMARY lines (count of each, complete list):
 first 120 lines of the log:
-time wall=0.140316 cpu=0.413663 threads=8 imbalance=1.538
-time wall=0.140316 cpu=0.413663 threads=8 imbalance=1.538
+time wall=0.149647 cpu=0.442579 threads=8 imbalance=1.520
+time wall=0.149647 cpu=0.442579 threads=8 imbalance=1.520
 
-=== distinct SUMMARY lines over all 4 runs of this section (count, complete) ===
+--- eco_pth --threads 4  < input 20x20 (mode: final)
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.244100 cpu=0.423726 threads=4 imbalance=1.077
+time wall=0.244100 cpu=0.423726 threads=4 imbalance=1.077
+
+--- eco_pth --threads 8  < input 20x20 (mode: final)
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.387699 cpu=0.760466 threads=8 imbalance=1.175
+time wall=0.387699 cpu=0.760466 threads=8 imbalance=1.175
+
+--- eco_pth --threads 4  < input unbal01 (mode: final)
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.122579 cpu=0.282305 threads=4 imbalance=1.443
+time wall=0.122579 cpu=0.282305 threads=4 imbalance=1.443
+
+--- eco_pth --threads 8  < input unbal01 (mode: final)
+exit code: 0; TSan warnings: 0; output identical to sequential: yes
+distinct SUMMARY lines (count of each, complete list):
+first 120 lines of the log:
+time wall=0.124366 cpu=0.373069 threads=8 imbalance=1.554
+time wall=0.124366 cpu=0.373069 threads=8 imbalance=1.554
+
+=== distinct SUMMARY lines over all 8 runs of this section (count, complete) ===
   (none)
 
-overall: 0 TSan warnings in 4 runs, expected 0; outputs identical to sequential in all runs: yes; section PASS
+=== distinct pairs of conflicting accesses, top frame of each (count, complete) ===
+
+overall: 0 TSan warnings in 8 runs, expected 0; outputs identical to sequential in all runs: yes; section PASS

@@ -50,7 +50,7 @@ SOURCE = os.path.join(HERE, "informe.md")
 OUTPUT = os.path.join(HERE, "informe.pdf")
 
 # Markers resolved at layout time, when numbers and pages of sections are known.
-LAYOUT_MARKERS = ("ref:", "page:", "fig:", "tab:")
+LAYOUT_MARKERS = ("ref:", "num:", "page:", "fig:", "tab:")
 CELL_BREAK = "¦"  # Line break inside a table cell.
 
 DESIGNS = {"seq": ("seq", "-"), "pth": ("pth", "-"), "omp_a": ("omp", "adaptive"), "omp_s": ("omp", "static")}
@@ -299,6 +299,9 @@ def resolve_tsan(which, what, *args):
     if what == "distinct":
         section = text.split("=== distinct SUMMARY lines over all")[1].split("overall:")[0]
         return str(len(re.findall(r"SUMMARY:", section)))
+    if what == "pairs":
+        section = text.split("=== distinct pairs of conflicting accesses")[1].split("overall:")[0]
+        return str(len(re.findall(r" <- ", section)))
     if what == "warnlist":
         return ", ".join(re.findall(r"TSan warnings: (\d+);", text))
     if what == "identical":
@@ -436,7 +439,7 @@ def table_grain():
 
 def table_adaptive():
     rows = []
-    for case, threads in (("100x100_unbal01", 8), ("100x100_unbal01", 16), ("100x100_unbal02", 8),
+    for case, threads in (("20x20", 2), ("20x20", 4), ("100x100_unbal01", 8), ("100x100_unbal01", 16), ("100x100_unbal02", 8),
                           ("100x100_unbal02", 16), ("200x200", 8), ("large1000x1000", 8), ("large1000x1000", 16)):
         cell = lambda d, m: resolve_perf("win", case, d, threads, m)
         rows.append([CASE_NAMES[case], threads, cell("omp_s", "imb"), cell("omp_a", "imb"),
@@ -551,6 +554,11 @@ def resolve_one(body):
         return eco_format(args[2], eco_rows(args[0])[args[1]][args[2]])
     if head == "ecor":
         return eco_range(args[0], args[1])
+    if head == "ecorh":
+        return eco_range(args[0], args[1]).replace(" a ", "-")
+    if head == "branchloc":
+        out = subprocess.run(["git", "show", "%s:%s" % (args[0], args[1])], cwd=ROOT, capture_output=True, text=True, check=True)
+        return str(len(out.stdout.splitlines()))
     if head == "ser":
         return resolve_series(*args)
     if head == "acf":
@@ -667,6 +675,8 @@ def inline(text, layout):
     def layout_marker(match):
         kind, key = match.group(1), match.group(2)
         if kind == "ref":
+            return hold('<a href="#%s" color="%s">sección\u00a0%s</a>' % (key, LINK, layout.sections[key]))
+        if kind == "num":
             return hold('<a href="#%s" color="%s">%s</a>' % (key, LINK, layout.sections[key]))
         if kind == "page":
             return hold('<a href="#%s" color="%s">%s</a>' % (key, LINK, layout.pages.get(key, 0)))
@@ -674,7 +684,7 @@ def inline(text, layout):
             return hold('<a href="#%s" color="%s">figura %s</a>' % (key, LINK, layout.figures[key]))
         return hold('<a href="#%s" color="%s">tabla %s</a>' % (key, LINK, layout.tables[key]))
 
-    text = re.sub(r"\{\{(ref|page|fig|tab):(.+?)\}\}", layout_marker, text)
+    text = re.sub(r"\{\{(ref|num|page|fig|tab):(.+?)\}\}", layout_marker, text)
     text = re.sub(r"`([^`]+)`", lambda m: hold('<font name="Mono" size="-0.6">%s</font>' % escape(m.group(1))), text)
     text = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
                   lambda m: hold('<a href="%s" color="%s">%s</a>' % (escape(m.group(2)), LINK, escape(m.group(1)))), text)
@@ -957,7 +967,8 @@ def read_source():
 def build(path=OUTPUT):
     register_fonts()
     styles = make_styles()
-    blocks = parse_blocks(resolve_markers(read_source()))
+    text = re.sub(r"(?<=\d) %", "\u00a0%", resolve_markers(read_source()))
+    blocks = parse_blocks(text)
     layout, toc = number_blocks(blocks)
     pages = None
     for _ in range(6):  # Page numbers appear in the text, so repeat until they settle.

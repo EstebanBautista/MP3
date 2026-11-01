@@ -6,7 +6,8 @@
 # dies with "unexpected memory mapping" otherwise. The script re-executes itself under
 # "setarch <arch> -R" for that reason.
 # Builds without -static (incompatible with TSan) into /tmp, runs 20x20 and unbal01 at 4 and 8
-# threads, and writes the evidence to experiments/results/tsan_pth.txt and tsan_omp.txt.
+# threads, each with --dump-all (observer active, with its extra barrier and thread 0 reading the
+# world) and without options (no observer, the path that the performance measurements use), and writes the evidence to experiments/results/tsan_pth.txt and tsan_omp.txt.
 # Variants (environment): CXX=clang++ with OMP_TOOL_LIBRARIES=libarcher.so, SKIP_PTH=1 and
 # OMP_RESULT=<file> run only OpenMP under LLVM's Archer, which instruments the OpenMP barriers.
 # COVERAGE=1 (clang only) also builds with source coverage and appends the call counts of
@@ -45,7 +46,8 @@ tr -d '\r' < $B/in_unbal01 > $B/in_unbal01.lf && mv $B/in_unbal01.lf $B/in_unbal
 export TSAN_OPTIONS="halt_on_error=0 exitcode=66 second_deadlock_stack=1${TSAN_EXTRA:+ $TSAN_EXTRA}"
 
 for inp in 20x20 unbal01; do
-  $B/eco_seq --dump-all < $B/in_$inp > $B/expected_$inp 2> $B/seq_$inp.err
+  $B/eco_seq --dump-all < $B/in_$inp > $B/expected_dump_$inp 2> $B/seq_$inp.err
+  $B/eco_seq < $B/in_$inp > $B/expected_final_$inp 2>> $B/seq_$inp.err
 done
 
 report() { # name file-to-write binary expect-warnings(0|1)
@@ -75,18 +77,21 @@ report() { # name file-to-write binary expect-warnings(0|1)
     fi
     echo
   } > "$file"
+  for mode in dump final; do
   for inp in 20x20 unbal01; do
     for t in 4 8; do
-      local log=$B/run_${name}_${inp}_$t.log
-      LLVM_PROFILE_FILE=$B/prof_%p.profraw $bin --threads $t --dump-all < $B/in_$inp > $B/out.txt 2> $log
+      local log=$B/run_${name}_${inp}_${t}_$mode.log
+      local opts=""
+      [ $mode = dump ] && opts=--dump-all
+      LLVM_PROFILE_FILE=$B/prof_%p.profraw $bin --threads $t $opts < $B/in_$inp > $B/out.txt 2> $log
       local rc=$?
       local warns
       warns=$(grep -c 'WARNING: ThreadSanitizer' $log)
       total=$((total + warns))
       local same=no
-      cmp -s $B/out.txt $B/expected_$inp && same=yes
+      cmp -s $B/out.txt $B/expected_${mode}_$inp && same=yes
       {
-        echo "--- $(basename $bin) --threads $t < input $inp"
+        echo "--- $(basename $bin) --threads $t $opts < input $inp (mode: $mode)"
         echo "exit code: $rc; TSan warnings: $warns; output identical to sequential: $same"
         echo "distinct SUMMARY lines (count of each, complete list):"
         grep 'SUMMARY: ThreadSanitizer' $log | sed 's/ (BuildId.*) in / in /' | sort | uniq -c | sort -rn | sed 's/^/  /'
@@ -103,20 +108,32 @@ report() { # name file-to-write binary expect-warnings(0|1)
       fi
     done
   done
+  done
   {
-    echo "=== distinct SUMMARY lines over all 4 runs of this section (count, complete) ==="
+    echo "=== distinct SUMMARY lines over all 8 runs of this section (count, complete) ==="
     cat $B/run_${name}_*.log | grep 'SUMMARY: ThreadSanitizer' | sed 's/ (BuildId.*) in / in /' | sort | uniq -c | sort -rn | sed 's/^/  /'
     echo "(none)" | grep -q . && [ "$total" -eq 0 ] && echo "  (none)"
+    echo
+    echo "=== distinct pairs of conflicting accesses, top frame of each (count, complete) ==="
+    cat $B/run_${name}_*.log | awk '
+      /^  (Read|Write|Atomic [a-z]+) of size/ { want = 1; prev = 0; next }
+      /^  Previous / { want = 1; prev = 1; next }
+      want && /#0/ {
+        where = "other"
+        if (match($0, /[A-Za-z_\/.]*\/?[a-z_0-9]+\.(cpp|hpp|c|h):[0-9]+/)) where = substr($0, RSTART, RLENGTH)
+        if (prev) print first " <- " where; else first = where
+        want = 0
+      }' | sort | uniq -c | sort -rn | sed 's/^/  /'
     echo
   } >> "$file"
   if [ -n "${COVERAGE:-}" ]; then
     echo "profile files merged: $(ls $B/prof_*.profraw | wc -l)" > $B/nprof.txt
     llvm-profdata merge -o $B/all.profdata $B/prof_*.profraw
     {
-      echo "=== source coverage of the same 4 runs (llvm-cov, FNDA = executions of the function) ==="
+      echo "=== source coverage of the same 8 runs (llvm-cov, FNDA = executions of the function) ==="
       cat $B/nprof.txt
-      echo "Rounds of rebalancing: 20x20 has 1000 gens -> 20, unbal01 has $GENS_UNBAL gens -> $((GENS_UNBAL / 50)); two thread counts each."
-      echo "Expected adaptiveBands calls (thread 0, once per round): $(( 2 * (20 + GENS_UNBAL / 50) )). Expected rebalance calls (every thread): $(( (20 + GENS_UNBAL / 50) * 12 ))."
+      echo "Rounds of rebalancing: 20x20 has 1000 gens -> 20, unbal01 has $GENS_UNBAL gens -> $((GENS_UNBAL / 50)); two thread counts and two modes each."
+      echo "Expected adaptiveBands calls (thread 0, once per round): $(( 4 * (20 + GENS_UNBAL / 50) )). Expected rebalance calls (every thread): $(( (20 + GENS_UNBAL / 50) * 24 ))."
       echo "Counters are not atomic, so measured counts of the per-thread functions can be lower."
       llvm-cov export $bin -instr-profile=$B/all.profdata -format=lcov | grep '^FNDA' | grep -i 'rebalance\|adaptiveBands\|fillRowCosts\|fillRowOwners' | sed 's/^/  /'
       echo
@@ -124,9 +141,9 @@ report() { # name file-to-write binary expect-warnings(0|1)
   fi
   {
     if [ "$expect" = 1 ]; then
-      echo "overall: $total TSan warnings in 4 runs, EXPECTED for this section (uninstrumented libgomp, see the note at the top); outputs identical to sequential in all runs: $([ $sec -eq 0 ] && echo yes || echo NO, see above)"
+      echo "overall: $total TSan warnings in 8 runs, EXPECTED for this section (uninstrumented libgomp, see the note at the top); outputs identical to sequential in all runs: $([ $sec -eq 0 ] && echo yes || echo NO, see above)"
     else
-      echo "overall: $total TSan warnings in 4 runs, expected 0; outputs identical to sequential in all runs: $([ $sec -eq 0 ] && echo yes || echo NO); section $([ $sec -eq 0 ] && echo PASS || echo FAIL)"
+      echo "overall: $total TSan warnings in 8 runs, expected 0; outputs identical to sequential in all runs: $([ $sec -eq 0 ] && echo yes || echo NO); section $([ $sec -eq 0 ] && echo PASS || echo FAIL)"
     fi
   } >> "$file"
   [ $sec -ne 0 ] && status=1
