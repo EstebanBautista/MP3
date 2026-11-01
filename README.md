@@ -14,10 +14,10 @@ Además hay una interfaz web local, pruebas automáticas, scripts de medición y
 - CMake.
 - Ninja.
 - Python 3.12.
-- matplotlib y reportlab, solo para regenerar las figuras y el PDF del informe (`pip install matplotlib reportlab`). numpy también lo usan los scripts de experimentos.
+- Los paquetes de `requirements.txt` (`python -m pip install -r requirements.txt`): pypdf, numpy, reportlab y matplotlib. Los usan las pruebas, los scripts de experimentos y el informe.
 - Docker, solo para `scripts/tsan.sh` (ThreadSanitizer).
 
-El resto (motores, interfaz web y pruebas) solo necesita Python y el compilador.
+Los motores y la interfaz web solo necesitan Python y el compilador. Node es opcional: sin él se omiten las pruebas de `tests/test_web_restart.py`.
 
 ## Compilar
 
@@ -58,7 +58,7 @@ cmd /c "build\eco_pth.exe --threads 4 < ecosystem_examples\input200x200 > salida
 cmd /c "build\eco_omp.exe --threads 8 --schedule adaptive < ecosystem_examples\input100x100_unbal01 > salida.txt"
 ```
 
-Git Bash, Linux o macOS:
+Git Bash o Linux:
 
 ```sh
 build/eco_seq < ecosystem_examples/input20x20 > salida.txt
@@ -82,23 +82,23 @@ Desde la carpeta del proyecto, después de compilar:
 python -m unittest discover -s tests -v
 ```
 
-La suite tiene 261 pruebas. Comparan los tres motores con los casos de la tarea, con 1, 2, 4, 8 y 16 hilos, además de casos límite, la entrada y salida, el servidor web, las mediciones y el informe. No se incluye `ecosystem_examples/allgen100x100` (300 MB, se excluye del repositorio); ninguna prueba lo necesita. Si se agrega, la herramienta `tools/diff_allgen.py` compara dos archivos `allgen`.
+La suite tiene 272 pruebas. Comparan los tres motores con los casos de la tarea, con 1, 2, 4, 8 y 16 hilos, además de casos límite, la entrada y salida, el servidor web, las mediciones y el informe. No se incluye `ecosystem_examples/allgen100x100` (300 MB, se excluye del repositorio); ninguna prueba lo necesita. Si se agrega, la herramienta `tools/diff_allgen.py` compara dos archivos `allgen`.
 
 ## Repetir mediciones y experimentos
 
 Las mediciones de tiempo y los experimentos de dinámica de población son reproducibles. Los resultados ya calculados están en `experiments/results/`.
 
 ```sh
-python experiments/measure.py env                 # describe el equipo y el compilador
-python experiments/measure.py gen-large           # genera el mundo grande (no se guarda en git)
-python experiments/measure.py run                 # mide; reanuda si se interrumpe
-python experiments/measure.py summary             # tabla: mediana, rango intercuartil, aceleración, eficiencia
+python experiments/measure.py env --out mi_entorno.txt      # describe el equipo y el compilador
+python experiments/measure.py gen-large                     # genera el mundo grande (no se guarda en git)
+python experiments/measure.py run --csv mis_tiempos.csv     # mide; reanuda si se interrumpe
+python experiments/measure.py summary --csv mis_tiempos.csv # tabla: mediana, rango intercuartil, aceleración, eficiencia
 python experiments/plot_performance.py            # figuras de rendimiento
 python experiments/ecosystem_runs.py run          # experimentos de población con eco_seq
 python experiments/ecosystem_runs.py plot         # figuras de población
 ```
 
-`measure.py run` acepta `--reps`, `--cases`, `--threads` y `--csv`; consulte `--help` de cada subcomando. Una medición completa tarda; los tiempos dependen del equipo. `measure.py run` se detiene si alguna salida difiere del caso esperado.
+Use siempre rutas nuevas en `--csv` y `--out`. Sin `--csv`, `measure.py run` toma `experiments/results/performance.csv`, ve las filas ya guardadas y no mide nada; sin `--out`, `measure.py env` sobrescribe `experiments/results/environment.txt`. `measure.py run` también acepta `--reps`, `--cases` y `--threads`; consulte `--help` de cada subcomando. Una medición completa tarda; los tiempos dependen del equipo. `measure.py run` se detiene si alguna salida difiere del caso esperado.
 
 ThreadSanitizer (necesita Docker; el encabezado de `scripts/tsan.sh` trae la orden exacta):
 
@@ -115,6 +115,8 @@ Para regenerarlo:
 ```sh
 python docs/report/build_report.py
 ```
+
+La generación lee el tamaño de los diseños desde las ramas `diseno-*` o `origin/diseno-*`. Por eso falla desde un ZIP o desde un clon de una sola rama: hace falta un clon con esas ramas.
 
 Antes de la entrega, abra `docs/report/build_report.py` y edite las dos constantes del inicio:
 

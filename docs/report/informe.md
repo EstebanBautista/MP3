@@ -225,7 +225,7 @@ Incluso con los valores elegidos, el tiempo en estos dos casos no mejora frente 
 | Ventajas | Desventajas |
 |---|---|
 | Se adapta a la carga: por ejemplo, en 1000x1000 con 8 hilos baja el desequilibrio de {{perf:win:large1000x1000:omp_s:8:imb}} a {{perf:win:large1000x1000:omp_a:8:imb}}. | Esa mejora no se traduce en una ganancia clara de tiempo, y en los casos "unbal" es algo más lento que el control estático. |
-| Gestión de hilos más breve: el compilador crea el equipo, y el código de hilos es solo una región paralela y sus barreras. | Es el más complejo por lógica: añade costes, cortes, dueños cambiantes y dos barreras más cada 50 generaciones. |
+| Menos código de gestión de hilos: el compilador crea el equipo, y el código de hilos es solo una región paralela y sus barreras. | Es el más complejo por lógica: añade costes, cortes, dueños cambiantes y dos barreras más cada 50 generaciones. |
 | Fue el mejor en 200x200 en el contenedor Linux: ×{{perf:linux:200x200:omp_a:16:speedup}} con 16 hilos, aunque con mucha variación. | En Windows es el más lento con barreras: en 100x100 con 16 hilos, {{perf:win:100x100:omp_a:16:wall}} s frente a {{perf:win:100x100:pth:16:wall}} s de Pthreads. |
 | Comparte las pasadas con el diseño 2, y un mismo binario hace de control con `--schedule static`. | Comprobar carreras es más difícil: la biblioteca de gcc no está instrumentada, y hace falta otra cadena de herramientas ({{ref:tsan}}). |
 
@@ -336,7 +336,7 @@ Por eso se consideran falsos positivos, sin suprimir ninguno y sin cambiar el mo
 
 - **Equipo:** {{env:win:cpu}}, {{env:win:cores}} núcleos físicos y {{env:win:threadslogical}} lógicos, {{env:win:ramgb}} GB de RAM, Windows 10 nativo.
 - **Compilación:** g++ {{env:win:compiler}}, `{{env:win:flags}}`, enlazado estático.
-- **Mediciones:** {{env:win:reps}} repeticiones por configuración, con orden alternado, en 6 mundos y con 1, 2, 4, 8 y 16 hilos. Se reporta la mediana y, entre corchetes, el rango intercuartil (IQR). La carga de CPU antes de empezar era de {{env:win:load}} %. Docker Desktop estaba abierto en segundo plano, sin contenedores en marcha.
+- **Mediciones:** {{env:win:reps}} repeticiones por configuración, con orden alternado, en 6 mundos y con 1, 2, 4, 8 y 16 hilos. Se reporta la mediana y, entre corchetes, el rango intercuartil (IQR). Había otros programas abiertos, carga {{env:win:load}} % antes de empezar.
 - **Métricas:** tiempo total (reloj monótono), tiempo de CPU de todo el proceso, aceleración (`T_seq / T`, siempre respecto a `eco_seq`), eficiencia (aceleración / hilos) y desequilibrio (mayor tiempo ocupado / media). Sin interfaz y sin escritura de cuadros; la lectura y la escritura de archivos quedan fuera. En Windows, el tiempo de CPU tiene una resolución de unos 15,6 ms, de modo que en 20x20 no es fiable.
 - **Mundo grande:** generado con semilla {{env:win:seed}}: 1000x1000, con las densidades de `input200x200`, {{env:win:ngen}} generaciones.
 
@@ -530,7 +530,7 @@ Requisitos: g++ con OpenMP y Pthreads (se usó WinLibs GCC {{env:win:compiler}})
 
 ```
 # Compilar en Windows (deja eco_seq, eco_pth y eco_omp en build/)
-powershell scripts/build.ps1
+powershell -ExecutionPolicy Bypass -File scripts/build.ps1
 
 # Compilar en Linux
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DECO_STATIC=OFF && cmake --build build

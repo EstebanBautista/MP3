@@ -31,7 +31,7 @@ STATIC_FILES = {
 }
 EXAMPLES_DIR = os.path.join(ROOT, "ecosystem_examples")
 DEFAULT_ENGINE = os.path.join(ROOT, "build", "eco_seq" + (".exe" if os.name == "nt" else ""))
-BUILD_HINT = "powershell scripts/build.ps1"
+BUILD_HINT = "powershell -ExecutionPolicy Bypass -File scripts/build.ps1"
 
 FRAME_HEADER_SIZE = 16
 MAX_FRAMES_BYTES = 32 * 1024 * 1024
