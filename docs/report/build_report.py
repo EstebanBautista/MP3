@@ -557,8 +557,12 @@ def resolve_one(body):
     if head == "ecorh":
         return eco_range(args[0], args[1]).replace(" a ", "-")
     if head == "branchloc":
-        out = subprocess.run(["git", "show", "%s:%s" % (args[0], args[1])], cwd=ROOT, capture_output=True, text=True, check=True)
-        return str(len(out.stdout.splitlines()))
+        # A fresh clone has only the remote-tracking branches (origin/<branch>), so try those too.
+        for ref in (args[0], "origin/" + args[0]):
+            out = subprocess.run(["git", "show", "%s:%s" % (ref, args[1])], cwd=ROOT, capture_output=True, text=True)
+            if out.returncode == 0:
+                return str(len(out.stdout.splitlines()))
+        raise RuntimeError("branch %s has no file %s (fetch the branches first)" % (args[0], args[1]))
     if head == "ser":
         return resolve_series(*args)
     if head == "acf":
