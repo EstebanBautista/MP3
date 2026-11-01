@@ -82,7 +82,7 @@ Desde la carpeta del proyecto, después de compilar:
 python -m unittest discover -s tests -v
 ```
 
-La suite tiene 272 pruebas. Comparan los tres motores con los casos de la tarea, con 1, 2, 4, 8 y 16 hilos, además de casos límite, la entrada y salida, el servidor web, las mediciones y el informe. No se incluye `ecosystem_examples/allgen100x100` (300 MB, se excluye del repositorio); ninguna prueba lo necesita. Si se agrega, la herramienta `tools/diff_allgen.py` compara dos archivos `allgen`.
+La suite tiene 239 pruebas. Comparan los tres motores con los casos de la tarea, con 1, 2, 4, 8 y 16 hilos, además de casos límite, la entrada y salida, el servidor web, las mediciones y el informe. No se incluye `ecosystem_examples/allgen100x100` (300 MB, se excluye del repositorio); ninguna prueba lo necesita. Si se agrega, la herramienta `tools/diff_allgen.py` compara dos archivos `allgen`.
 
 ## Repetir mediciones y experimentos
 
