@@ -17,6 +17,7 @@ const RULE_INPUTS = ["gen_proc_rabbits", "gen_proc_foxes", "gen_food_foxes", "n_
 let cases = [];
 let state = "idle";     // idle, running, paused, finished, error
 let run = null;
+let starting = false;     // A start request is on its way; the server may already have killed the old run.
 let speed = 50;
 let lastTick = 0;
 let heartbeatTimer = 0;
@@ -96,6 +97,8 @@ function showError(message) {
 
 async function start(event) {
   event.preventDefault();
+  if (starting) return;
+  starting = true;
   showError("");
   let reply, body;
   try {
@@ -104,6 +107,8 @@ async function start(event) {
   } catch {
     showError("No se puede conectar con el servidor. Comprueba que web/server.py siga en marcha.");
     return;
+  } finally {
+    starting = false;
   }
   if (!reply.ok) {
     showError(body.error);  // A rejected start leaves the current run as it was.
@@ -116,6 +121,7 @@ async function start(event) {
 
 function beginRun(info) {
   if (run) run.abort.abort();
+  showError("");
   run = {
     id: info.run_id,
     rows: info.rows,
@@ -215,6 +221,12 @@ function failRun(message) {
   setState("error", "Simulación detenida");
 }
 
+// While a start is pending, a failure may only be the restart killing the old run. If the start is
+// rejected the run goes on, so the next request reports any real failure again.
+function failRunIfCurrent(owner, message) {
+  if (owner === run && !starting) failRun(message);
+}
+
 async function replyError(reply) {
   try {
     return (await reply.json()).error;
@@ -225,7 +237,7 @@ async function replyError(reply) {
 
 async function pump() {
   const current = run;
-  if (!current || state !== "running" || current.fetching || current.serverDone) return;
+  if (!current || starting || state !== "running" || current.fetching || current.serverDone) return;
   const wanted = Math.max(1, Math.min(Math.ceil(speed * 0.4), Math.floor(MAX_REQUEST_BYTES / current.frameSize)));
   const missing = wanted - (current.queue.length - current.queueHead);
   if (missing < Math.ceil(wanted / 2)) return;
@@ -235,7 +247,7 @@ async function pump() {
     const reply = await fetch(`/api/frames?count=${missing}&run=${current.id}`, { signal: current.abort.signal });
     if (current !== run) return;
     if (!reply.ok) {
-      failRun(await replyError(reply));
+      failRunIfCurrent(current, await replyError(reply));
       return;
     }
     const buffer = await reply.arrayBuffer();
@@ -243,10 +255,10 @@ async function pump() {
     for (let at = 0; at + current.frameSize <= buffer.byteLength; at += current.frameSize) {
       current.queue.push({ buffer, at });
     }
-    current.serverDone = reply.headers.get("X-Finished") === "1";
+    if (!starting) current.serverDone = reply.headers.get("X-Finished") === "1";
   } catch (error) {
-    if (error.name !== "AbortError" && current === run) {
-      failRun("Se perdió la conexión con el servidor. Comprueba que web/server.py siga en marcha.");
+    if (error.name !== "AbortError") {
+      failRunIfCurrent(current, "Se perdió la conexión con el servidor. Comprueba que web/server.py siga en marcha.");
     }
     return;
   } finally {
@@ -261,8 +273,9 @@ async function heartbeat() {
   if (!current || (state !== "running" && state !== "paused")) return;
   try {
     const reply = await fetch(`/api/frames?count=0&run=${current.id}`);
-    if (current === run && !reply.ok && (state === "running" || state === "paused")) {
-      failRun(await replyError(reply));
+    if (!reply.ok && (state === "running" || state === "paused")) {
+      const message = await replyError(reply);
+      if (state === "running" || state === "paused") failRunIfCurrent(current, message);
     }
   } catch {
     // The next frame request reports a lost connection.
@@ -294,7 +307,7 @@ function consume(now) {
     run.queueHead = 0;
   }
   if (consumed === 0) {
-    if (run.serverDone && run.queueHead >= run.queue.length && run.gen < run.nGen) {
+    if (!starting && run.serverDone && run.queueHead >= run.queue.length && run.gen < run.nGen) {
       failRun("El motor terminó antes de la última generación.");
     }
     return;
