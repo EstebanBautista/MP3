@@ -161,6 +161,22 @@ class TestSource(unittest.TestCase):
         self.assertEqual(worse, [("20x20", 2), ("20x20", 4)])
         self.assertIn("22 de las 24", source_text())
 
+    def test_only_the_large_world_passes_four_times_in_every_parallel_engine(self):
+        """The claim of the summary and of the main results, against the medians of the CSV."""
+        win = medians(os.path.join(RESULTS, "performance.csv"))
+        engines = (("pth", "-"), ("omp", "adaptive"), ("omp", "static"))
+
+        def speedups(case, threads):
+            return [win[("seq", "-", case, "1")] / win[(*e, case, threads)] for e in engines]
+
+        passing = [case for case in build_report.WIN_CASES
+                   if any(min(speedups(case, t)) > 4 for t in ("2", "4", "8", "16"))]
+        self.assertEqual(passing, ["large1000x1000"])
+        self.assertGreater(min(speedups("large1000x1000", "16")), 4)
+        self.assertLess(min(speedups("large1000x1000", "8")), 4)
+        self.assertEqual(source_text().count("es el único mundo donde Pthreads y OpenMP, adaptativo y estático, pasan de 4 veces"), 2)
+        self.assertNotIn("aceleración clara en todos", source_text())
+
     def test_required_honesty_statements(self):
         text = source_text()
         for phrase in ("no se observaron carreras", "Archer", "libgomp", "no se investigó",

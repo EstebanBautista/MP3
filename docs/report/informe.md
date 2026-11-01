@@ -6,7 +6,7 @@ Este proyecto simula un ecosistema de conejos, zorros y rocas sobre una matriz, 
 
 Los tres diseños producen el mismo resultado que los 7 casos de la tarea, con 1, 2, 4, 8 y 16 hilos. Los resultados principales son estos, y varios no son los que se esperaban:
 
-- **Más hilos no siempre es más rápido.** En Windows, 1000x1000 es el único mundo con aceleración clara en todos los diseños: ×{{perf:win:large1000x1000:pth:8:speedup}} con Pthreads y 8 hilos. En 20x20 todos los diseños paralelos son más lentos que el secuencial, y en 100x100 el mejor resultado es ×{{perf:win:100x100:pth:4:speedup}}.
+- **Más hilos no siempre es más rápido.** En Windows, 1000x1000 es el único mundo donde Pthreads y OpenMP, adaptativo y estático, pasan de 4 veces el secuencial: lo logran con 16 hilos (×{{perf:win:large1000x1000:pth:16:speedup}}, ×{{perf:win:large1000x1000:omp_a:16:speedup}} y ×{{perf:win:large1000x1000:omp_s:16:speedup}}). En 20x20 todos los diseños paralelos son más lentos que el secuencial, y en 100x100 el mejor resultado es ×{{perf:win:100x100:pth:4:speedup}}.
 - **Con un hilo, los motores paralelos cuestan más que el secuencial:** de {{overr:win}}. No se investigó la causa.
 - **El reparto adaptativo reduce el desequilibrio en casi todas las configuraciones, con excepciones en 20x20, pero no da una ganancia clara de tiempo.** Además, los dos casos "unbal" muestran poco desequilibrio incluso con reparto estático.
 - **La comparación entre OpenMP y Pthreads depende de la plataforma.** En Windows gana Pthreads; en un contenedor Linux sobre WSL2 se invierte en 200x200, y no se demostró la causa.
@@ -349,7 +349,7 @@ Las tablas completas están en la {{ref:tablas}}, y los datos crudos en `experim
 
 ![fig_acel|0.88|Aceleración respecto a `eco_seq` en Windows, en escala logarítmica. Por debajo de 1 es más lento que el secuencial. Las líneas de OpenMP adaptativo y estático casi coinciden.](figuras/perf_aceleracion.png)
 
-**El tamaño del mundo decide.** En 20x20, todos los diseños con 2 o más hilos son más lentos que el secuencial: {{perf:win:20x20:pth:16:wall}} s con Pthreads y {{perf:win:20x20:omp_a:16:wall}} s con OpenMP a 16 hilos, frente a {{perf:win:20x20:seq:1:wall}} s. En 100x100 solo Pthreads gana, con un máximo de ×{{perf:win:100x100:pth:4:speedup}}. En 200x200, Pthreads llega a ×{{perf:win:200x200:pth:8:speedup}} con 8 hilos. El único caso con aceleración clara en todos los diseños es 1000x1000.
+**El tamaño del mundo decide.** En 20x20, todos los diseños con 2 o más hilos son más lentos que el secuencial: {{perf:win:20x20:pth:16:wall}} s con Pthreads y {{perf:win:20x20:omp_a:16:wall}} s con OpenMP a 16 hilos, frente a {{perf:win:20x20:seq:1:wall}} s. En 100x100 solo Pthreads gana, con un máximo de ×{{perf:win:100x100:pth:4:speedup}}. En 200x200, Pthreads llega a ×{{perf:win:200x200:pth:8:speedup}} con 8 hilos. 1000x1000 es el único mundo donde Pthreads y OpenMP, adaptativo y estático, pasan de 4 veces: ×{{perf:win:large1000x1000:pth:16:speedup}}, ×{{perf:win:large1000x1000:omp_a:16:speedup}} y ×{{perf:win:large1000x1000:omp_s:16:speedup}} con 16 hilos.
 
 **Con 16 hilos no se gana casi nunca.** En Windows, 16 hilos son más lentos que 8 en todos los mundos, salvo en 1000x1000. Allí, Pthreads y OpenMP adaptativo empatan dentro del IQR, y el control estático mejora de {{perf:win:large1000x1000:omp_s:8:wall}} s [{{perf:win:large1000x1000:omp_s:8:iqr}}] a {{perf:win:large1000x1000:omp_s:16:wall}} s [{{perf:win:large1000x1000:omp_s:16:iqr}}]. El equipo tiene 8 núcleos físicos, y del hilo 9 al 16 son núcleos lógicos.
 
