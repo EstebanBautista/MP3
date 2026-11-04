@@ -1,0 +1,14 @@
+.git
+build
+build-linux
+.superpowers
+docs/superpowers
+docs/video
+ejemplo de rubrica
+**/__pycache__
+*.pyc
+*.profraw
+bash.exe.stackdump
+experiments/data
+ecosystem_examples/allgen100x100
+ecosystem_examples/allgen100x100.zip

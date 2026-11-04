@@ -1,0 +1,7 @@
+services:
+  ecosistema:
+    build: .
+    image: ecosistema-mp3
+    ports:
+      - "8000:8000"
+    init: true

@@ -1,1 +1,4 @@
 *.sh text eol=lf
+Dockerfile text eol=lf
+# Engine input and expected output: keep the bytes exactly as committed.
+ecosystem_examples/** -text

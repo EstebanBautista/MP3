@@ -326,7 +326,7 @@ class Handler(BaseHTTPRequestHandler):
     def host_allowed(self):
         """Stops other sites from reaching this server through DNS rebinding."""
         port = self.server.server_address[1]
-        return self.headers.get("Host") in (f"{HOST}:{port}", f"localhost:{port}")
+        return self.headers.get("Host") in (f"127.0.0.1:{port}", f"localhost:{port}")
 
     def dispatch(self, routes):
         if not self.host_allowed():
@@ -416,6 +416,8 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description="Interfaz web local de la simulación de ecosistema.")
     parser.add_argument("--port", type=int, default=8000)
+    # Docker needs 0.0.0.0 so the published port reaches the server; the Host check still applies.
+    parser.add_argument("--host", default=HOST, help=argparse.SUPPRESS)
     parser.add_argument("--engine", default=DEFAULT_ENGINE, help=argparse.SUPPRESS)
     parser.add_argument("--idle-timeout", type=float, default=DEFAULT_IDLE_TIMEOUT, help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -431,9 +433,9 @@ def main():
     if hasattr(signal, "SIGBREAK"):
         signal.signal(signal.SIGBREAK, exit_on_signal)
 
-    server = ThreadingHTTPServer((HOST, args.port), Handler)
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
     server.daemon_threads = True
-    print(f"Abre la página en http://{HOST}:{server.server_address[1]}", flush=True)
+    print(f"Abre la página en http://127.0.0.1:{server.server_address[1]}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
